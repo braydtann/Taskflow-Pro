@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { CalendarView, GanttChart, EnhancedKanbanBoard, SmartScheduling } from './advanced-components';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -18,12 +19,28 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
     tags: task?.tags?.join(", ") || ""
   });
 
+  const [showSmartScheduling, setShowSmartScheduling] = useState(false);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const submitData = {
       ...formData,
       estimated_duration: formData.estimated_duration ? parseInt(formData.estimated_duration) : null,
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+      owners: formData.owners.split(",").map(s => s.trim()).filter(s => s),
+      collaborators: formData.collaborators.split(",").map(s => s.trim()).filter(s => s),
+      tags: formData.tags.split(",").map(s => s.trim()).filter(s => s)
+    };
+    onSubmit(submitData);
+  };
+
+  const handleScheduleRecommendation = (scheduledTask) => {
+    const submitData = {
+      ...formData,
+      estimated_duration: scheduledTask.estimated_duration,
+      start_time: scheduledTask.start_time,
+      end_time: scheduledTask.end_time,
+      due_date: scheduledTask.end_time,
       owners: formData.owners.split(",").map(s => s.trim()).filter(s => s),
       collaborators: formData.collaborators.split(",").map(s => s.trim()).filter(s => s),
       tags: formData.tags.split(",").map(s => s.trim()).filter(s => s)
@@ -152,6 +169,29 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
               placeholder="urgent, backend, feature"
             />
           </div>
+
+          {/* Smart Scheduling Section */}
+          {!task && formData.estimated_duration && (
+            <div className="smart-scheduling-section">
+              <div className="scheduling-toggle">
+                <button
+                  type="button"
+                  onClick={() => setShowSmartScheduling(!showSmartScheduling)}
+                  className="btn btn-secondary"
+                >
+                  🤖 Smart Scheduling {showSmartScheduling ? '▼' : '▶'}
+                </button>
+              </div>
+              
+              {showSmartScheduling && (
+                <SmartScheduling
+                  task={{ ...formData, estimated_duration: parseInt(formData.estimated_duration) }}
+                  existingTasks={[]} // You can pass existing tasks here
+                  onScheduleRecommendation={handleScheduleRecommendation}
+                />
+              )}
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" onClick={onCancel} className="btn btn-secondary">
