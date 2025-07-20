@@ -597,7 +597,8 @@ const TaskManager = ({ initialTab = "tasks" }) => {
             { id: "tasks", label: "List View", icon: "📋" },
             { id: "kanban", label: "Kanban Board", icon: "📊" },
             { id: "projects", label: "Projects", icon: "📁" },
-            { id: "calendar", label: "Calendar", icon: "📅" }
+            { id: "calendar", label: "Calendar", icon: "📅" },
+            { id: "gantt", label: "Gantt Chart", icon: "📈" }
           ].map(tab => (
             <button
               key={tab.id}
