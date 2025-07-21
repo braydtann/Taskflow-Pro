@@ -449,7 +449,7 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpd
 };
 
 // Enhanced Kanban Board with Drag and Drop
-export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, projects, selectedProject, onTaskEdit }) => {
+export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, projects, selectedProject, onTaskEdit, onTimerUpdate }) => {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -494,6 +494,12 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
     }
   }
 
+  const handleTaskUpdate = async (updatedTask) => {
+    if (onTimerUpdate) {
+      onTimerUpdate(updatedTask);
+    }
+  };
+
   return (
     <div className="enhanced-kanban-board">
       <DndContext
@@ -511,9 +517,14 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
                 <div className="kanban-stats">
                   <span className="task-count">{columnTasks.length}</span>
                   {columnTasks.length > 0 && (
-                    <span className="estimated-time">
-                      {Math.round(columnTasks.reduce((sum, task) => sum + (task.estimated_duration || 0), 0) / 60)}h
-                    </span>
+                    <>
+                      <span className="estimated-time">
+                        {Math.round(columnTasks.reduce((sum, task) => sum + (task.estimated_duration || 0), 0) / 60)}h est
+                      </span>
+                      <span className="actual-time">
+                        {Math.round(columnTasks.reduce((sum, task) => sum + (task.timer_elapsed_seconds || 0), 0) / 3600)}h actual
+                      </span>
+                    </>
                   )}
                 </div>
               </div>
@@ -527,6 +538,7 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
                       onEdit={onTaskEdit}
                       onDelete={onTaskDelete}
                       onStatusChange={onTaskUpdate}
+                      onTaskUpdate={handleTaskUpdate}
                     />
                   ))}
                 </SortableContext>
