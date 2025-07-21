@@ -511,7 +511,43 @@ const TaskManager = ({ initialTab = "tasks" }) => {
   useEffect(() => {
     fetchTasks();
     fetchProjects();
+    
+    // Handle navigation from dashboard
+    handleDashboardNavigation();
   }, []);
+
+  // Handle navigation from dashboard (when user clicks on today's tasks)
+  const handleDashboardNavigation = () => {
+    // Check if we need to scroll to a specific task
+    const scrollToTaskId = localStorage.getItem('scrollToTaskId');
+    if (scrollToTaskId) {
+      localStorage.removeItem('scrollToTaskId');
+      // Wait for tasks to load, then scroll
+      setTimeout(() => {
+        const taskElement = document.querySelector(`[data-task-id="${scrollToTaskId}"]`);
+        if (taskElement) {
+          taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the task briefly
+          taskElement.style.backgroundColor = '#fef3c7';
+          taskElement.style.borderColor = '#f59e0b';
+          setTimeout(() => {
+            taskElement.style.backgroundColor = '';
+            taskElement.style.borderColor = '';
+          }, 3000);
+        }
+      }, 1000);
+    }
+    
+    // Check if we need to open create task form
+    const openCreateTaskForm = localStorage.getItem('openCreateTaskForm');
+    if (openCreateTaskForm) {
+      localStorage.removeItem('openCreateTaskForm');
+      setTimeout(() => {
+        setShowTaskForm(true);
+        setEditingTask(null);
+      }, 500);
+    }
+  };
 
   // Handle real-time task updates
   useEffect(() => {
