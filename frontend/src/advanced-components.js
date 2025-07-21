@@ -493,30 +493,45 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
 
   function handleDragEnd(event) {
     const { active, over } = event;
+    
+    console.log('Drag end event:', { active: active?.id, over: over?.id });
 
-    if (!over) return;
+    if (!over) {
+      console.log('No drop target found');
+      return;
+    }
 
     const activeTask = filteredTasks.find(task => task.id === active.id);
-    if (!activeTask) return;
+    if (!activeTask) {
+      console.log('Active task not found:', active.id);
+      return;
+    }
 
     // Determine new status from drop zone
     let newStatus = activeTask.status;
     
     // Check if dropped on a column (droppable zone)
-    if (columns.find(col => col.id === over.id)) {
+    const targetColumn = columns.find(col => col.id === over.id);
+    if (targetColumn) {
       newStatus = over.id;
+      console.log('Dropped on column:', targetColumn.title);
     } else {
-      // Dropped on another task, find the column
+      // Dropped on another task, find the column that task belongs to
       const overTask = filteredTasks.find(task => task.id === over.id);
       if (overTask) {
         newStatus = overTask.status;
+        console.log('Dropped on task:', overTask.title, 'in column:', newStatus);
+      } else {
+        console.log('Unknown drop target:', over.id);
       }
     }
 
     // Only update if status actually changed
     if (newStatus !== activeTask.status) {
-      console.log(`Moving task ${activeTask.title} from ${activeTask.status} to ${newStatus}`);
+      console.log(`Moving task "${activeTask.title}" from ${activeTask.status} to ${newStatus}`);
       onTaskUpdate(active.id, newStatus);
+    } else {
+      console.log('Task status unchanged:', newStatus);
     }
   }
 
