@@ -347,7 +347,7 @@ export const GanttChart = ({ tasks, projects, onTaskUpdate }) => {
 };
 
 // Enhanced Draggable Kanban Card
-const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange }) => {
+const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate }) => {
   const {
     attributes,
     listeners,
@@ -374,7 +374,7 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange }) => {
       style={style}
       {...attributes}
       {...listeners}
-      className="kanban-card draggable"
+      className={`kanban-card draggable ${task.is_timer_running ? 'kanban-card-timer-active' : ''}`}
     >
       <div className="kanban-card-header">
         <h4 className="kanban-card-title">{task.title}</h4>
@@ -396,27 +396,41 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange }) => {
         <p className="kanban-card-description">{task.description}</p>
       )}
 
+      {/* Timer Section for Kanban */}
+      <div className="kanban-timer-section">
+        <TimerControls 
+          task={task} 
+          onTimerUpdate={onTaskUpdate}
+          compact={true}
+        />
+      </div>
+
       <div className="kanban-card-meta">
         <span className={`priority-badge ${priorityColors[task.priority]}`}>
           {task.priority}
         </span>
         {task.estimated_duration && (
           <span className="duration-badge">
-            {Math.round(task.estimated_duration / 60)}h
+            Est: {Math.round(task.estimated_duration / 60)}h
+          </span>
+        )}
+        {(task.timer_elapsed_seconds > 0 || task.is_timer_running) && (
+          <span className="actual-duration-badge">
+            Actual: {Math.round((task.timer_elapsed_seconds || 0) / 60)} min
           </span>
         )}
       </div>
 
-      {task.owners && task.owners.length > 0 && (
+      {task.assigned_users && task.assigned_users.length > 0 && (
         <div className="kanban-card-owners">
           <div className="owner-avatars">
-            {task.owners.slice(0, 3).map((owner, index) => (
+            {task.assigned_users.slice(0, 3).map((owner, index) => (
               <div key={index} className="owner-avatar">
                 {owner.charAt(0).toUpperCase()}
               </div>
             ))}
-            {task.owners.length > 3 && (
-              <div className="owner-avatar more">+{task.owners.length - 3}</div>
+            {task.assigned_users.length > 3 && (
+              <div className="owner-avatar more">+{task.assigned_users.length - 3}</div>
             )}
           </div>
         </div>
