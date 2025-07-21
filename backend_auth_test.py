@@ -512,8 +512,8 @@ class AuthenticationTester:
                 refresh_token = login_response.get('refresh_token')
                 
                 if refresh_token:
-                    # Test refresh token endpoint - FastAPI expects it as form data or JSON body with the parameter name
-                    response = self.session.post(f"{BACKEND_URL}/auth/refresh", data={"refresh_token": refresh_token})
+                    # Test refresh token endpoint - it expects the token as a query parameter
+                    response = self.session.post(f"{BACKEND_URL}/auth/refresh?refresh_token={refresh_token}")
                     
                     if response.status_code == 200:
                         refresh_response = response.json()
