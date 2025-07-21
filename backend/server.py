@@ -1060,6 +1060,305 @@ async def get_task_timer_status(task_id: str, current_user: UserInDB = Depends(g
         "timer_sessions_count": len(task.get("timer_sessions", []))
     }
 
+# Admin User Management endpoints
+@api_router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(current_user: UserInDB = Depends(get_current_admin_user)):
+    """Get all users (admin only)"""
+    users = await db.users.find({}).sort("created_at", -1).to_list(1000)
+    return [UserResponse(**user) for user in users]
+
+@api_router.post("/admin/users", response_model=UserResponse)
+async def create_user_by_admin(user_data: AdminUserCreate, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Create a new user (admin only)"""
+    # Check if user already exists
+    existing_user = await db.users.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]})
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    user_dict = user_data.dict()
+    del user_dict["password"]
+    
+    user = UserInDB(**user_dict, hashed_password=hashed_password)
+    await db.users.insert_one(user.dict())
+    
+    return UserResponse(**user.dict())
+
+@api_router.put("/admin/users/{user_id}", response_model=UserResponse)
+async def update_user_by_admin(user_id: str, user_update: AdminUserUpdate, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Update a user (admin only)"""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check for duplicate email/username if being updated
+    if user_update.email or user_update.username:
+        filter_conditions = []
+        if user_update.email:
+            filter_conditions.append({"email": user_update.email})
+        if user_update.username:
+            filter_conditions.append({"username": user_update.username})
+        
+        existing_user = await db.users.find_one({
+            "$or": filter_conditions,
+            "id": {"$ne": user_id}  # Exclude current user
+        })
+        
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email or username already exists"
+            )
+    
+    update_dict = {k: v for k, v in user_update.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow()
+    
+    await db.users.update_one({"id": user_id}, {"$set": update_dict})
+    updated_user = await db.users.find_one({"id": user_id})
+    return UserResponse(**updated_user)
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_user_by_admin(user_id: str, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Delete a user (admin only)"""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent admin from deleting themselves
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own admin account")
+    
+    # Remove user from all teams
+    await db.teams.update_many(
+        {"$or": [{"members": user_id}, {"team_lead_id": user_id}]},
+        {"$pull": {"members": user_id}, "$unset": {"team_lead_id": ""}}
+    )
+    
+    # Deactivate instead of delete to preserve data integrity
+    await db.users.update_one(
+        {"id": user_id}, 
+        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "User deactivated successfully"}
+
+# Team Management endpoints
+@api_router.get("/admin/teams", response_model=List[Team])
+async def get_all_teams(current_user: UserInDB = Depends(get_current_admin_user)):
+    """Get all teams (admin only)"""
+    teams = await db.teams.find({"is_active": True}).sort("created_at", -1).to_list(1000)
+    return [Team(**team) for team in teams]
+
+@api_router.post("/admin/teams", response_model=Team)
+async def create_team(team_data: TeamCreate, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Create a new team (admin only)"""
+    # Check if team name already exists
+    existing_team = await db.teams.find_one({"name": team_data.name, "is_active": True})
+    if existing_team:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Team name already exists"
+        )
+    
+    # Validate team lead and members exist
+    if team_data.team_lead_id:
+        team_lead = await db.users.find_one({"id": team_data.team_lead_id, "is_active": True})
+        if not team_lead:
+            raise HTTPException(status_code=404, detail="Team lead not found")
+    
+    for member_id in team_data.members:
+        member = await db.users.find_one({"id": member_id, "is_active": True})
+        if not member:
+            raise HTTPException(status_code=404, detail=f"Member with ID {member_id} not found")
+    
+    team_dict = team_data.dict()
+    team_dict["created_by"] = current_user.id
+    
+    team = Team(**team_dict)
+    await db.teams.insert_one(team.dict())
+    
+    # Update users' team_ids
+    if team_data.members:
+        await db.users.update_many(
+            {"id": {"$in": team_data.members}},
+            {"$addToSet": {"team_ids": team.id}}
+        )
+    
+    if team_data.team_lead_id and team_data.team_lead_id not in team_data.members:
+        await db.users.update_one(
+            {"id": team_data.team_lead_id},
+            {"$addToSet": {"team_ids": team.id}}
+        )
+    
+    return team
+
+@api_router.put("/admin/teams/{team_id}", response_model=Team)
+async def update_team(team_id: str, team_update: TeamUpdate, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Update a team (admin only)"""
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check for duplicate name if being updated
+    if team_update.name and team_update.name != team["name"]:
+        existing_team = await db.teams.find_one({
+            "name": team_update.name,
+            "is_active": True,
+            "id": {"$ne": team_id}
+        })
+        if existing_team:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Team name already exists"
+            )
+    
+    # Validate new team lead and members
+    if team_update.team_lead_id:
+        team_lead = await db.users.find_one({"id": team_update.team_lead_id, "is_active": True})
+        if not team_lead:
+            raise HTTPException(status_code=404, detail="Team lead not found")
+    
+    if team_update.members:
+        for member_id in team_update.members:
+            member = await db.users.find_one({"id": member_id, "is_active": True})
+            if not member:
+                raise HTTPException(status_code=404, detail=f"Member with ID {member_id} not found")
+    
+    update_dict = {k: v for k, v in team_update.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow()
+    
+    # Handle member changes
+    if team_update.members is not None:
+        # Remove team from old members
+        old_members = set(team.get("members", []))
+        new_members = set(team_update.members)
+        
+        members_to_remove = old_members - new_members
+        members_to_add = new_members - old_members
+        
+        if members_to_remove:
+            await db.users.update_many(
+                {"id": {"$in": list(members_to_remove)}},
+                {"$pull": {"team_ids": team_id}}
+            )
+        
+        if members_to_add:
+            await db.users.update_many(
+                {"id": {"$in": list(members_to_add)}},
+                {"$addToSet": {"team_ids": team_id}}
+            )
+    
+    await db.teams.update_one({"id": team_id}, {"$set": update_dict})
+    updated_team = await db.teams.find_one({"id": team_id})
+    return Team(**updated_team)
+
+@api_router.delete("/admin/teams/{team_id}")
+async def delete_team(team_id: str, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Delete a team (admin only)"""
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Remove team from all users
+    await db.users.update_many(
+        {"team_ids": team_id},
+        {"$pull": {"team_ids": team_id}}
+    )
+    
+    # Deactivate team instead of deleting
+    await db.teams.update_one(
+        {"id": team_id},
+        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "Team deleted successfully"}
+
+@api_router.get("/admin/teams/{team_id}", response_model=Team)
+async def get_team(team_id: str, current_user: UserInDB = Depends(get_current_admin_user)):
+    """Get a specific team (admin only)"""
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return Team(**team)
+
+# Admin Dashboard Analytics
+@api_router.get("/admin/analytics/dashboard")
+async def get_admin_dashboard_analytics(current_user: UserInDB = Depends(get_current_admin_user)):
+    """Get comprehensive admin dashboard analytics"""
+    
+    # User statistics
+    total_users = await db.users.count_documents({"is_active": True})
+    admin_users = await db.users.count_documents({"role": "admin", "is_active": True})
+    regular_users = total_users - admin_users
+    
+    # Team statistics
+    total_teams = await db.teams.count_documents({"is_active": True})
+    
+    # Task statistics across all users
+    total_tasks = await db.tasks.count_documents({})
+    completed_tasks = await db.tasks.count_documents({"status": "completed"})
+    in_progress_tasks = await db.tasks.count_documents({"status": "in_progress"})
+    
+    # Project statistics
+    total_projects = await db.projects.count_documents({"status": "active"})
+    
+    # Recent activity (last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_users = await db.users.count_documents({"created_at": {"$gte": week_ago}})
+    recent_tasks = await db.tasks.count_documents({"created_at": {"$gte": week_ago}})
+    recent_projects = await db.projects.count_documents({"created_at": {"$gte": week_ago}})
+    
+    # Top teams by task count
+    pipeline = [
+        {"$lookup": {"from": "tasks", "localField": "members", "foreignField": "owner_id", "as": "member_tasks"}},
+        {"$addFields": {"task_count": {"$size": "$member_tasks"}}},
+        {"$sort": {"task_count": -1}},
+        {"$limit": 5},
+        {"$project": {"name": 1, "task_count": 1, "members": {"$size": "$members"}}}
+    ]
+    
+    top_teams = await db.teams.aggregate(pipeline).to_list(5)
+    
+    # Most active users (by task completion in last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    active_users_pipeline = [
+        {"$match": {"status": "completed", "completed_at": {"$gte": thirty_days_ago}}},
+        {"$group": {"_id": "$owner_id", "completed_tasks": {"$sum": 1}}},
+        {"$lookup": {"from": "users", "localField": "_id", "foreignField": "id", "as": "user"}},
+        {"$unwind": "$user"},
+        {"$project": {"user_id": "$_id", "full_name": "$user.full_name", "username": "$user.username", "completed_tasks": 1}},
+        {"$sort": {"completed_tasks": -1}},
+        {"$limit": 5}
+    ]
+    
+    active_users = await db.tasks.aggregate(active_users_pipeline).to_list(5)
+    
+    return {
+        "overview": {
+            "total_users": total_users,
+            "admin_users": admin_users,
+            "regular_users": regular_users,
+            "total_teams": total_teams,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "in_progress_tasks": in_progress_tasks,
+            "total_projects": total_projects,
+            "completion_rate": round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0, 2)
+        },
+        "recent_activity": {
+            "new_users_week": recent_users,
+            "new_tasks_week": recent_tasks,
+            "new_projects_week": recent_projects
+        },
+        "top_teams": top_teams,
+        "most_active_users": active_users,
+        "generated_at": datetime.utcnow().isoformat()
+    }
+
 # User Management
 @api_router.get("/users/search")
 async def search_users(query: str, current_user: UserInDB = Depends(get_current_active_user)):
