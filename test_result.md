@@ -333,9 +333,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Analytics Dashboard Component"
-    - "Task Management Interface"
-    - "Multiple View Components (List, Calendar, Kanban, Gantt)"
+    - "User Registration API with Password Validation"
+    - "User Login API with JWT Token Generation"
+    - "JWT Token Authentication Middleware"
+    - "Protected Routes with User Authentication"
+    - "User-Specific Data Isolation"
+    - "Personal Analytics with User Context"
+    - "User Profile Management APIs"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
