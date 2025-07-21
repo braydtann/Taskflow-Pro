@@ -688,6 +688,7 @@ const TaskManager = ({ initialTab = "tasks" }) => {
               setEditingTask(task);
               setShowTaskForm(true);
             }}
+            onTimerUpdate={handleTaskUpdate}
             projects={projects}
             selectedProject={selectedProject}
           />
