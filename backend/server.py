@@ -674,7 +674,15 @@ async def get_tasks(
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None
 ):
-    # Base filter - user can only see tasks they own, are assigned to, or collaborate on
+    # Get user's team IDs to find shared tasks
+    user_teams = current_user.team_ids if hasattr(current_user, 'team_ids') else []
+    
+    # Base filter - user can see tasks they:
+    # 1. Own
+    # 2. Are assigned to
+    # 3. Collaborate on
+    # 4. Belong to projects they have access to (owner or collaborator)
+    # 5. Belong to projects their teams have access to
     filter_dict = {
         "$or": [
             {"owner_id": current_user.id},
@@ -683,13 +691,45 @@ async def get_tasks(
         ]
     }
     
+    # Add project-based access if user has teams or project access
+    project_access_conditions = []
+    
+    # Projects user owns or collaborates on
+    user_projects = await db.projects.find({
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }).to_list(1000)
+    
+    user_project_ids = [p["id"] for p in user_projects]
+    
+    if user_project_ids:
+        project_access_conditions.append({"project_id": {"$in": user_project_ids}})
+    
+    # Add team-based project access if user has teams
+    if user_teams:
+        team_projects = await db.projects.find({
+            "team_ids": {"$in": user_teams}
+        }).to_list(1000)
+        
+        team_project_ids = [p["id"] for p in team_projects]
+        if team_project_ids:
+            project_access_conditions.append({"project_id": {"$in": team_project_ids}})
+    
+    # Add project access conditions to main filter
+    if project_access_conditions:
+        filter_dict["$or"].extend(project_access_conditions)
+    
+    # Apply additional filters
     if project_id:
-        # Verify user has access to this project
+        # Verify user has access to this specific project
         project = await db.projects.find_one({
             "id": project_id,
             "$or": [
                 {"owner_id": current_user.id},
-                {"collaborators": current_user.id}
+                {"collaborators": current_user.id},
+                {"team_ids": {"$in": user_teams}} if user_teams else {}
             ]
         })
         if not project:
