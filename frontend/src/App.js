@@ -226,30 +226,95 @@ const Dashboard = () => {
       {/* Personalized Hero Section */}
       <div className="hero-section">
         <div className="hero-content">
-          <h1 className="hero-title">Welcome back, {user?.full_name}!</h1>
-          <p className="hero-subtitle">
-            Here's your personal productivity overview for today
-          </p>
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <div className="stat-number">{overview.total_tasks}</div>
-              <div className="stat-label">Total Tasks</div>
-            </div>
-            <div className="hero-stat">
-              <div className="stat-number">{overview.completion_rate}%</div>
-              <div className="stat-label">Completion Rate</div>
-            </div>
-            <div className="hero-stat">
-              <div className="stat-number">{overview.active_projects}</div>
-              <div className="stat-label">Active Projects</div>
+          <div className="hero-left">
+            <h1 className="hero-title">Welcome back, {user?.full_name}!</h1>
+            <p className="hero-subtitle">
+              Here's your personal productivity overview for today
+            </p>
+            <div className="hero-stats">
+              <div className="hero-stat">
+                <div className="stat-number">{overview.total_tasks}</div>
+                <div className="stat-label">Total Tasks</div>
+              </div>
+              <div className="hero-stat">
+                <div className="stat-number">{overview.completion_rate}%</div>
+                <div className="stat-label">Completion Rate</div>
+              </div>
+              <div className="hero-stat">
+                <div className="stat-number">{overview.active_projects}</div>
+                <div className="stat-label">Active Projects</div>
+              </div>
             </div>
           </div>
-          <div className="hero-image">
-            <img 
-              src="https://images.unsplash.com/photo-1608222351212-18fe0ec7b13b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwxfHxkYXNoYm9hcmQlMjBhbmFseXRpY3N8ZW58MHx8fHwxNzUzMDM4MDI5fDA&ixlib=rb-4.1.0&q=85"
-              alt="Personal Analytics Dashboard"
-              className="hero-img"
-            />
+          
+          {/* Today's Tasks Panel */}
+          <div className="hero-right">
+            <div className="todays-tasks-panel">
+              <div className="todays-tasks-header">
+                <h3 className="todays-tasks-title">📅 Today's Focus</h3>
+                <span className="todays-tasks-count">{todaysTasks.length} tasks</span>
+              </div>
+              
+              {todaysTasks.length > 0 ? (
+                <ul className="todays-tasks-list">
+                  {todaysTasks.map(task => (
+                    <li 
+                      key={task.id}
+                      className="todays-task-item"
+                      onClick={() => handleTaskClick(task.id)}
+                    >
+                      <div className="task-item-content">
+                        <div className="task-item-main">
+                          <span className="task-item-title">{task.title}</span>
+                          <span className={`task-item-priority priority-${task.priority}`}>
+                            {task.priority === 'urgent' && '🔥'}
+                            {task.priority === 'high' && '⚡'}
+                            {task.priority === 'medium' && '📋'}
+                            {task.priority === 'low' && '📝'}
+                          </span>
+                        </div>
+                        <div className="task-item-meta">
+                          {task.due_date && (
+                            <span className="task-item-time">
+                              Due {new Date(task.due_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          )}
+                          {task.start_time && !task.due_date && (
+                            <span className="task-item-time">
+                              Starts {new Date(task.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          )}
+                          <span className={`task-item-status status-${task.status}`}>
+                            {task.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="task-item-arrow">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9 6l6 6-6 6"/>
+                        </svg>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="no-tasks-today">
+                  <div className="no-tasks-content">
+                    <div className="no-tasks-icon">📅</div>
+                    <p className="no-tasks-message">No tasks scheduled for today</p>
+                    <button 
+                      className="create-task-btn"
+                      onClick={handleCreateTask}
+                    >
+                      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                      </svg>
+                      Create Task
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
