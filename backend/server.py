@@ -569,6 +569,71 @@ async def refresh_token(refresh_token: str):
 async def get_current_user_info(current_user: UserInDB = Depends(get_current_active_user)):
     return UserResponse(**current_user.dict())
 
+# WebSocket endpoint for real-time updates
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    # Verify user authentication via WebSocket
+    try:
+        # Get token from query parameters
+        token = websocket.query_params.get("token")
+        if not token:
+            await websocket.close(code=1008, reason="Token missing")
+            return
+        
+        # Verify JWT token
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            token_user_id = payload.get("user_id")
+            if token_user_id != user_id:
+                await websocket.close(code=1008, reason="Token mismatch")
+                return
+        except JWTError:
+            await websocket.close(code=1008, reason="Invalid token")
+            return
+        
+        # Connect user to WebSocket manager
+        await manager.connect(websocket, user_id)
+        
+        try:
+            # Send welcome message
+            await manager.send_personal_message({
+                "type": "connection_established",
+                "message": "Real-time updates connected",
+                "user_id": user_id
+            }, user_id)
+            
+            # Keep connection alive and handle incoming messages
+            while True:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                
+                # Handle different message types
+                if message.get("type") == "ping":
+                    await manager.send_personal_message({
+                        "type": "pong",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }, user_id)
+                elif message.get("type") == "user_typing":
+                    # Broadcast typing indicators to relevant users
+                    task_id = message.get("task_id")
+                    if task_id:
+                        task = await db.tasks.find_one({"id": task_id})
+                        if task:
+                            await manager.broadcast_task_update({
+                                **task,
+                                "typing_user": user_id
+                            }, "user_typing", user_id)
+                
+        except WebSocketDisconnect:
+            manager.disconnect(websocket, user_id)
+        except Exception as e:
+            logging.error(f"WebSocket error for user {user_id}: {str(e)}")
+            manager.disconnect(websocket, user_id)
+    
+    except Exception as e:
+        logging.error(f"WebSocket connection error: {str(e)}")
+        await websocket.close(code=1011, reason="Internal error")
+
 # Task endpoints (updated with user filtering)
 @api_router.post("/tasks", response_model=Task)
 async def create_task(task_data: TaskCreate, current_user: UserInDB = Depends(get_current_active_user)):
