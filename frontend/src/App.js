@@ -98,6 +98,7 @@ const Navigation = () => {
       </div>
 
       <div className="nav-user">
+        <RealTimeStatus />
         <div className="user-profile-container">
           <button 
             className="user-profile-btn"
