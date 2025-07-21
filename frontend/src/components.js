@@ -673,6 +673,7 @@ const TaskManager = ({ initialTab = "tasks" }) => {
                   }}
                   onDelete={handleTaskDelete}
                   onStatusChange={handleTaskStatusChange}
+                  onTaskUpdate={handleTaskUpdate}
                 />
               ))}
           </div>
