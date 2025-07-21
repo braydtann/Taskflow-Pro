@@ -424,7 +424,7 @@ class CollaborativeFeaturesTester:
                 """Listen for WebSocket updates"""
                 try:
                     uri = f"{WEBSOCKET_URL}/{user_id}?token={token}"
-                    async with websockets.connect(uri, timeout=10) as websocket:
+                    async with websockets.connect(uri) as websocket:
                         # Skip welcome message
                         await websocket.recv()
                         
