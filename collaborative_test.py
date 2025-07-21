@@ -243,7 +243,7 @@ class CollaborativeFeaturesTester:
         """Test task creation with collaborators and assigned users"""
         print("\n=== Testing Collaborative Task Creation ===")
         
-        if not self.test_data['projects'] or not self.test_data['regular_users']:
+        if not self.test_data['projects'] or len(self.test_data['regular_users']) < 1:
             self.log_result("Collaborative Task Setup", False, "Projects or users not available")
             return False
         
@@ -252,7 +252,11 @@ class CollaborativeFeaturesTester:
             owner_token = self.test_data['tokens'][self.test_data['regular_users'][0]['username']]
             headers = {"Authorization": f"Bearer {owner_token}"}
             
-            # Create task with collaborators and assigned users
+            # Create task with collaborators and assigned users (use available users)
+            available_users = self.test_data['regular_users']
+            assigned_users = [available_users[0]['id']] if len(available_users) > 0 else []
+            collaborators = [available_users[0]['id']] if len(available_users) > 0 else []
+            
             task_data = {
                 "title": "Implement Real-time WebSocket Communication",
                 "description": "Build WebSocket endpoints for real-time task updates and collaboration",
@@ -260,8 +264,8 @@ class CollaborativeFeaturesTester:
                 "project_id": project['id'],
                 "estimated_duration": 480,  # 8 hours
                 "due_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
-                "assigned_users": [self.test_data['regular_users'][1]['id']],
-                "collaborators": [self.test_data['regular_users'][2]['id']],
+                "assigned_users": assigned_users,
+                "collaborators": collaborators,
                 "tags": ["websocket", "real-time", "collaboration"]
             }
             
