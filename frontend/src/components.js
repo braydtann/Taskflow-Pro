@@ -745,6 +745,7 @@ const TaskManager = ({ initialTab = "tasks" }) => {
                 <TaskCard
                   key={task.id}
                   task={task}
+                  recentlyUpdated={recentlyUpdatedTasks.has(task.id)}
                   onEdit={(task) => {
                     setEditingTask(task);
                     setShowTaskForm(true);
