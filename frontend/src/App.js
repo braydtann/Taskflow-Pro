@@ -123,11 +123,13 @@ const Navigation = () => {
 // Dashboard Component (Updated with Personal Analytics)
 const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);
+  const [todaysTasks, setTodaysTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchAnalytics();
+    fetchTodaysTasks();
   }, []);
 
   const fetchAnalytics = async () => {
@@ -139,6 +141,64 @@ const Dashboard = () => {
       console.error("Error fetching analytics:", error);
       setLoading(false);
     }
+  };
+
+  const fetchTodaysTasks = async () => {
+    try {
+      const response = await axios.get(`${API}/tasks`);
+      const allTasks = response.data;
+      
+      // Filter tasks for today based on due_date or start_time
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const todayTasks = allTasks.filter(task => {
+        // Check if task has due_date or start_time for today
+        const dueDate = task.due_date ? new Date(task.due_date) : null;
+        const startTime = task.start_time ? new Date(task.start_time) : null;
+        
+        // Include tasks due today or starting today, and exclude completed tasks
+        return task.status !== 'completed' && (
+          (dueDate && dueDate >= today && dueDate < tomorrow) ||
+          (startTime && startTime >= today && startTime < tomorrow) ||
+          (!dueDate && !startTime && task.status === 'in_progress') // Include active tasks without dates
+        );
+      });
+      
+      // Sort by priority (urgent > high > medium > low) and then by time
+      const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+      const sortedTasks = todayTasks.sort((a, b) => {
+        // First sort by priority
+        const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // Then by time (due_date or start_time, earliest first)
+        const aTime = new Date(a.due_date || a.start_time || a.created_at);
+        const bTime = new Date(b.due_date || b.start_time || b.created_at);
+        return aTime - bTime;
+      });
+      
+      // Take top 4 tasks
+      setTodaysTasks(sortedTasks.slice(0, 4));
+    } catch (error) {
+      console.error("Error fetching today's tasks:", error);
+      setTodaysTasks([]);
+    }
+  };
+
+  const handleTaskClick = (taskId) => {
+    // Navigate to tasks view and scroll to specific task
+    window.location.href = '/tasks';
+    // Store the task ID to scroll to it after navigation
+    localStorage.setItem('scrollToTaskId', taskId);
+  };
+
+  const handleCreateTask = () => {
+    // Navigate to tasks view and open create task form
+    window.location.href = '/tasks';
+    localStorage.setItem('openCreateTaskForm', 'true');
   };
 
   if (loading) {
