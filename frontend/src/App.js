@@ -22,6 +22,11 @@ const Navigation = () => {
     { path: "/analytics", label: "Analytics", icon: "📈" }
   ];
 
+  // Add admin nav item for admin users
+  if (user?.role === 'admin') {
+    navItems.push({ path: "/admin", label: "Admin", icon: "⚙️" });
+  }
+
   return (
     <nav className="nav-container">
       <div className="nav-brand">
