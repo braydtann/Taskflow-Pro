@@ -86,23 +86,23 @@ class CollaborativeFeaturesTester:
                     self.log_result("Admin User Setup", False, f"Failed to create/login admin: {response.text}")
                     return False
 
-            # Create regular test users
+            # Create regular test users - use existing credentials or create new ones
             test_users = [
                 {
                     "email": "newuser@example.com",
                     "username": "newuser",
                     "full_name": "New User",
-                    "password": "NewUserPass123"
+                    "password": "SecurePassword123"  # Try existing password
                 },
                 {
                     "email": "test@example.com", 
                     "username": "testuser",
                     "full_name": "Test User",
-                    "password": "TestUserPass123"
+                    "password": "SecurePassword123"  # Try existing password
                 },
                 {
-                    "email": "collaborator@example.com",
-                    "username": "collaborator",
+                    "email": "collab2024@example.com",  # Use different email
+                    "username": "collaborator2024",
                     "full_name": "Collaborator User", 
                     "password": "CollabPass123"
                 }
