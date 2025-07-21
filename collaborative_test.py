@@ -350,7 +350,7 @@ class CollaborativeFeaturesTester:
             async def test_websocket_connection():
                 try:
                     uri = f"{WEBSOCKET_URL}/{user['id']}?token={token}"
-                    async with websockets.connect(uri, timeout=10) as websocket:
+                    async with websockets.connect(uri) as websocket:
                         # Wait for welcome message
                         message = await asyncio.wait_for(websocket.recv(), timeout=5)
                         data = json.loads(message)
