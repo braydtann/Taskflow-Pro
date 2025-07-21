@@ -204,7 +204,69 @@ class ProjectCreate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
-# Authentication Utilities
+# Team Management Models
+class Team(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    created_by: str  # Admin user ID who created the team
+    team_lead_id: Optional[str] = None  # User ID of team lead
+    members: List[str] = []  # List of user IDs in the team
+    projects: List[str] = []  # List of project IDs assigned to this team
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    team_settings: Dict[str, Any] = {}
+
+class TeamCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    team_lead_id: Optional[str] = None
+    members: List[str] = []
+
+class TeamUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    team_lead_id: Optional[str] = None
+    members: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+# Admin User Management Models
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    username: str
+    full_name: str
+    role: UserRole = UserRole.USER
+    password: str
+    team_ids: List[str] = []
+
+class AdminUserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+    team_ids: Optional[List[str]] = None
+
+class UserResponse(UserBase):
+    id: str
+    created_at: datetime
+    is_active: bool
+    avatar_url: Optional[str] = None
+    team_ids: List[str] = []  # Teams this user belongs to
+    last_login: Optional[datetime] = None
+
+# Update existing UserInDB model to include team information
+class UserInDB(UserBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    avatar_url: Optional[str] = None
+    preferences: Dict[str, Any] = {}
+    team_ids: List[str] = []  # Teams this user belongs to
+    last_login: Optional[datetime] = None
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
