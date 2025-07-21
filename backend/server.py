@@ -140,6 +140,12 @@ class Task(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     time_logs: List[Dict[str, Any]] = []  # Track time spent
+    
+    # Timer functionality fields
+    timer_start_time: Optional[datetime] = None  # When current timer session started
+    timer_elapsed_seconds: int = 0  # Total accumulated time in seconds
+    is_timer_running: bool = False  # Whether timer is currently running
+    timer_sessions: List[Dict[str, Any]] = []  # Detailed timer session history
 
 class Project(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
