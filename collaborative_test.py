@@ -378,7 +378,7 @@ class CollaborativeFeaturesTester:
                 try:
                     invalid_token = "invalid.jwt.token"
                     uri = f"{WEBSOCKET_URL}/{user['id']}?token={invalid_token}"
-                    async with websockets.connect(uri, timeout=5) as websocket:
+                    async with websockets.connect(uri) as websocket:
                         await asyncio.wait_for(websocket.recv(), timeout=3)
                         return False, "Connection should have been rejected"
                 except websockets.exceptions.ConnectionClosedError as e:
