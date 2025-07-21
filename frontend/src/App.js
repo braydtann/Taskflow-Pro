@@ -385,6 +385,7 @@ const AppContent = () => {
           <Route path="/projects" element={<TaskManager initialTab="projects" />} />
           <Route path="/calendar" element={<TaskManager initialTab="calendar" />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </main>
     </div>
