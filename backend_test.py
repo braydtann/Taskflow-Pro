@@ -15,7 +15,7 @@ import random
 import string
 
 # Configuration
-BACKEND_URL = "https://2014dd9e-36f3-46e1-9c60-eaf1580b2c68.preview.emergentagent.com/api"
+BACKEND_URL = "https://5f9f27c3-39df-42c0-9993-777740083949.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 class TaskManagementTester:
