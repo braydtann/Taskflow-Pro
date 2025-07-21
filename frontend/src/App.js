@@ -3,13 +3,16 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import TaskManager from "./components";
+import { AuthProvider, useAuth, ProtectedRoute, UserProfile } from "./auth";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Navigation Component
+// Navigation Component (Updated with User Auth)
 const Navigation = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const [showProfile, setShowProfile] = useState(false);
   
   const navItems = [
     { path: "/", label: "Dashboard", icon: "📊" },
@@ -23,7 +26,11 @@ const Navigation = () => {
     <nav className="nav-container">
       <div className="nav-brand">
         <h2 className="nav-title">TaskFlow Pro</h2>
+        <div className="user-welcome">
+          Welcome back, {user?.full_name?.split(' ')[0] || 'User'}!
+        </div>
       </div>
+      
       <div className="nav-items">
         {navItems.map((item) => (
           <Link
@@ -38,14 +45,34 @@ const Navigation = () => {
           </Link>
         ))}
       </div>
+
+      <div className="nav-user">
+        <div className="user-profile-container">
+          <button 
+            className="user-profile-btn"
+            onClick={() => setShowProfile(!showProfile)}
+          >
+            <div className="user-avatar">
+              {user?.full_name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <span className="user-name">{user?.username}</span>
+            <svg className="dropdown-icon" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </button>
+          
+          {showProfile && <UserProfile />}
+        </div>
+      </div>
     </nav>
   );
 };
 
-// Dashboard Component
+// Dashboard Component (Updated with Personal Analytics)
 const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchAnalytics();
@@ -66,7 +93,7 @@ const Dashboard = () => {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading analytics...</p>
+        <p>Loading your personal analytics...</p>
       </div>
     );
   }
@@ -84,29 +111,43 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      {/* Hero Section */}
+      {/* Personalized Hero Section */}
       <div className="hero-section">
         <div className="hero-content">
-          <h1 className="hero-title">Welcome to TaskFlow Pro</h1>
+          <h1 className="hero-title">Welcome back, {user?.full_name}!</h1>
           <p className="hero-subtitle">
-            Your intelligent task management platform with powerful analytics
+            Here's your personal productivity overview for today
           </p>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <div className="stat-number">{overview.total_tasks}</div>
+              <div className="stat-label">Total Tasks</div>
+            </div>
+            <div className="hero-stat">
+              <div className="stat-number">{overview.completion_rate}%</div>
+              <div className="stat-label">Completion Rate</div>
+            </div>
+            <div className="hero-stat">
+              <div className="stat-number">{overview.active_projects}</div>
+              <div className="stat-label">Active Projects</div>
+            </div>
+          </div>
           <div className="hero-image">
             <img 
               src="https://images.unsplash.com/photo-1608222351212-18fe0ec7b13b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwxfHxkYXNoYm9hcmQlMjBhbmFseXRpY3N8ZW58MHx8fHwxNzUzMDM4MDI5fDA&ixlib=rb-4.1.0&q=85"
-              alt="Analytics Dashboard"
+              alt="Personal Analytics Dashboard"
               className="hero-img"
             />
           </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Personal Stats Cards */}
       <div className="stats-grid">
         <div className="stats-card stats-card-total">
           <div className="stats-content">
             <div className="stats-number">{overview.total_tasks}</div>
-            <div className="stats-label">Total Tasks</div>
+            <div className="stats-label">Your Tasks</div>
           </div>
           <div className="stats-icon">
             <svg fill="currentColor" viewBox="0 0 24 24">
@@ -139,23 +180,23 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="stats-card stats-card-projects">
+        <div className="stats-card stats-card-overdue">
           <div className="stats-content">
-            <div className="stats-number">{overview.total_projects}</div>
-            <div className="stats-label">Active Projects</div>
+            <div className="stats-number">{overview.overdue_tasks}</div>
+            <div className="stats-label">Overdue</div>
           </div>
           <div className="stats-icon">
             <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
             </svg>
           </div>
         </div>
       </div>
 
-      {/* Performance Chart Section */}
+      {/* Personal Performance Chart */}
       <div className="chart-section">
         <div className="chart-container">
-          <h3 className="chart-title">7-Day Productivity Trends</h3>
+          <h3 className="chart-title">Your 7-Day Productivity Trends</h3>
           <div className="chart-content">
             <div className="productivity-chart">
               {productivity_trends.slice(0, 7).reverse().map((day, index) => (
@@ -179,9 +220,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Completion Rate Circle */}
+        {/* Personal Completion Rate */}
         <div className="completion-rate-card">
-          <h3 className="chart-title">Completion Rate</h3>
+          <h3 className="chart-title">Your Success Rate</h3>
           <div className="completion-circle">
             <div className="completion-percentage">
               {overview.completion_rate}%
@@ -190,10 +231,15 @@ const Dashboard = () => {
           <p className="completion-text">
             {overview.completed_tasks} of {overview.total_tasks} tasks completed
           </p>
+          <div className="personal-badge">
+            🎯 {overview.completion_rate >= 80 ? 'Productivity Master!' : 
+                overview.completion_rate >= 60 ? 'On Track!' : 
+                'Room for Growth!'}
+          </div>
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Personalized Quick Actions */}
       <div className="quick-actions">
         <h3 className="section-title">Quick Actions</h3>
         <div className="action-grid">
@@ -204,8 +250,8 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className="action-content">
-              <h4>Create Task</h4>
-              <p>Add a new task to your workflow</p>
+              <h4>Create New Task</h4>
+              <p>Add a task to your personal workflow</p>
             </div>
           </Link>
 
@@ -216,8 +262,8 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className="action-content">
-              <h4>New Project</h4>
-              <p>Start organizing tasks into projects</p>
+              <h4>Start New Project</h4>
+              <p>Organize your tasks into projects</p>
             </div>
           </Link>
 
@@ -229,7 +275,7 @@ const Dashboard = () => {
             </div>
             <div className="action-content">
               <h4>View Analytics</h4>
-              <p>Deep dive into performance metrics</p>
+              <p>Deep dive into your performance metrics</p>
             </div>
           </Link>
         </div>
@@ -238,10 +284,11 @@ const Dashboard = () => {
   );
 };
 
-// Analytics Page Component
+// Analytics Page Component (Updated for Personal Analytics)
 const AnalyticsPage = () => {
   const [timeTrackingData, setTimeTrackingData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchTimeTracking();
@@ -259,20 +306,20 @@ const AnalyticsPage = () => {
   };
 
   if (loading) {
-    return <div className="loading-container">Loading analytics...</div>;
+    return <div className="loading-container">Loading your personal analytics...</div>;
   }
 
   return (
     <div className="analytics-page">
       <div className="page-header">
-        <h1 className="page-title">Performance Analytics</h1>
-        <p className="page-subtitle">Deep insights into your productivity patterns</p>
+        <h1 className="page-title">{user?.full_name}'s Performance Analytics</h1>
+        <p className="page-subtitle">Deep insights into your personal productivity patterns</p>
       </div>
 
       {timeTrackingData && (
         <div className="analytics-grid">
           <div className="analytics-card">
-            <h3 className="card-title">Time Distribution by Project</h3>
+            <h3 className="card-title">Your Time Distribution by Project</h3>
             <div className="time-distribution">
               {Object.entries(timeTrackingData.time_by_project).map(([project, minutes]) => (
                 <div key={project} className="time-item">
@@ -292,7 +339,7 @@ const AnalyticsPage = () => {
           </div>
 
           <div className="analytics-card">
-            <h3 className="card-title">Time Estimation Accuracy</h3>
+            <h3 className="card-title">Your Time Estimation Accuracy</h3>
             <div className="accuracy-display">
               <div className="accuracy-circle">
                 <div className="accuracy-percentage">
@@ -306,6 +353,11 @@ const AnalyticsPage = () => {
                 <div className="accuracy-item">
                   <span>Actual: {timeTrackingData.total_actual_hours}h</span>
                 </div>
+                <div className="accuracy-badge">
+                  {timeTrackingData.accuracy_percentage >= 80 ? '🎯 Excellent Estimation!' :
+                   timeTrackingData.accuracy_percentage >= 60 ? '📈 Good Progress!' :
+                   '🎯 Room for Improvement!'}
+                </div>
               </div>
             </div>
           </div>
@@ -315,24 +367,35 @@ const AnalyticsPage = () => {
   );
 };
 
+// Main App Content (Protected)
+const AppContent = () => {
+  return (
+    <div className="app-layout">
+      <Navigation />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/tasks" element={<TaskManager />} />
+          <Route path="/projects" element={<TaskManager initialTab="projects" />} />
+          <Route path="/calendar" element={<TaskManager initialTab="calendar" />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
+
 // Main App Component
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <div className="app-layout">
-          <Navigation />
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/tasks" element={<TaskManager />} />
-              <Route path="/projects" element={<TaskManager initialTab="projects" />} />
-              <Route path="/calendar" element={<TaskManager initialTab="calendar" />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-            </Routes>
-          </main>
-        </div>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <ProtectedRoute>
+            <AppContent />
+          </ProtectedRoute>
+        </BrowserRouter>
+      </AuthProvider>
     </div>
   );
 }
