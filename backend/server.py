@@ -746,6 +746,10 @@ async def update_task(task_id: str, task_update: TaskUpdate, current_user: UserI
     
     await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
     updated_task = await db.tasks.find_one({"id": task_id})
+    
+    # Broadcast real-time update to collaborators
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
     return Task(**updated_task)
 
 @api_router.delete("/tasks/{task_id}")
@@ -756,6 +760,9 @@ async def delete_task(task_id: str, current_user: UserInDB = Depends(get_current
     })
     if not task:
         raise HTTPException(status_code=404, detail="Task not found or you don't have permission to delete it")
+    
+    # Broadcast deletion before actually deleting
+    await manager.broadcast_task_update(task, "deleted", current_user.id)
     
     # Update project task count
     if task.get("project_id"):
