@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-do
 import axios from "axios";
 import TaskManager from "./components";
 import { AuthProvider, useAuth, ProtectedRoute, UserProfile } from "./auth";
+import { AdminDashboard, UserManagement, TeamManagement } from "./admin-components";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
