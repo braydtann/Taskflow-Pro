@@ -2109,54 +2109,41 @@ body {
 }
 
 @media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .action-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .analytics-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .hero-section {
-    padding: 32px 24px;
-  }
-  
-  .accuracy-display {
+  .auth-page {
     flex-direction: column;
-    text-align: center;
   }
   
-  .kanban-board {
+  .auth-background {
+    flex: none;
+    padding: 20px;
+  }
+  
+  .hero-title {
+    font-size: 32px;
+  }
+  
+  .hero-features {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .auth-content {
+    flex: 1;
+    padding: 20px;
+  }
+  
+  .auth-card {
+    padding: 24px;
+  }
+  
+  .hero-stats {
     grid-template-columns: 1fr;
+    max-width: 200px;
   }
   
-  .project-list {
-    grid-template-columns: 1fr;
-  }
-  
-  .manager-header {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
-  }
-  
-  .header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  
-  .tab-list {
-    width: 100%;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-  
-  .tab-button {
-    white-space: nowrap;
-    min-width: 120px;
+  .user-profile-dropdown {
+    right: -50px;
+    min-width: 200px;
   }
 }
