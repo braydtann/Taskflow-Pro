@@ -478,10 +478,10 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
 
     // Determine new status from drop zone
     let newStatus = activeTask.status;
-    const overColumnId = over.id;
     
-    if (overColumnId === 'todo' || overColumnId === 'in_progress' || overColumnId === 'completed') {
-      newStatus = overColumnId;
+    // Check if dropped on a column (droppable zone)
+    if (columns.find(col => col.id === over.id)) {
+      newStatus = over.id;
     } else {
       // Dropped on another task, find the column
       const overTask = filteredTasks.find(task => task.id === over.id);
@@ -490,7 +490,9 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
       }
     }
 
+    // Only update if status actually changed
     if (newStatus !== activeTask.status) {
+      console.log(`Moving task ${activeTask.title} from ${activeTask.status} to ${newStatus}`);
       onTaskUpdate(active.id, newStatus);
     }
   }
