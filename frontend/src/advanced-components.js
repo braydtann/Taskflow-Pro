@@ -22,6 +22,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { TimerControls } from './timer-components';
 
 const localizer = momentLocalizer(moment);
 
