@@ -314,8 +314,8 @@ const ProjectForm = ({ project, onSubmit, onCancel }) => {
   );
 };
 
-// Task Card Component (Updated with Timer)
-const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate }) => {
+// Task Card Component (Updated with Timer and Real-time Indicators)
+const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate, recentlyUpdated }) => {
   const priorityColors = {
     low: "bg-green-100 text-green-800",
     medium: "bg-yellow-100 text-yellow-800",
@@ -334,7 +334,14 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate }) => {
     <div className={`task-card ${task.is_timer_running ? 'task-card-timer-active' : ''}`}>
       <div className="task-header">
         <div className="task-title-section">
-          <h4 className="task-title">{task.title}</h4>
+          <h4 className="task-title">
+            {task.title}
+            {recentlyUpdated && (
+              <span className="task-realtime-indicator updated">
+                ✨ Just updated
+              </span>
+            )}
+          </h4>
           <div className="task-badges">
             <span className={`task-badge ${priorityColors[task.priority]}`}>
               {task.priority}
