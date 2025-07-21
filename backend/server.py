@@ -38,6 +38,86 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI(title="TaskFlow Pro API", version="2.0.0")
 api_router = APIRouter(prefix="/api")
 
+# WebSocket Connection Manager for Real-time Updates
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}  # user_id -> [websockets]
+        self.user_teams: Dict[str, List[str]] = {}  # user_id -> [team_ids]
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+        
+        # Load user's teams for targeted broadcasts
+        user = await db.users.find_one({"id": user_id})
+        if user:
+            self.user_teams[user_id] = user.get("team_ids", [])
+    
+    def disconnect(self, websocket: WebSocket, user_id: str):
+        if user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+                if user_id in self.user_teams:
+                    del self.user_teams[user_id]
+    
+    async def send_personal_message(self, message: dict, user_id: str):
+        """Send message to specific user"""
+        if user_id in self.active_connections:
+            for websocket in self.active_connections[user_id]:
+                try:
+                    await websocket.send_text(json.dumps(message))
+                except:
+                    pass
+    
+    async def send_team_message(self, message: dict, team_ids: List[str], exclude_user: str = None):
+        """Send message to all users in specified teams"""
+        for user_id, user_teams in self.user_teams.items():
+            if exclude_user and user_id == exclude_user:
+                continue
+            
+            # Check if user is in any of the target teams
+            if any(team_id in user_teams for team_id in team_ids):
+                await self.send_personal_message(message, user_id)
+    
+    async def send_project_message(self, message: dict, project_id: str, exclude_user: str = None):
+        """Send message to all collaborators of a project"""
+        project = await db.projects.find_one({"id": project_id})
+        if project:
+            collaborators = project.get("collaborators", []) + [project.get("owner_id")]
+            for user_id in collaborators:
+                if exclude_user and user_id == exclude_user:
+                    continue
+                await self.send_personal_message(message, user_id)
+    
+    async def broadcast_task_update(self, task: dict, action: str, user_id: str):
+        """Broadcast task updates to relevant users"""
+        message = {
+            "type": "task_update",
+            "action": action,  # "created", "updated", "deleted"
+            "task": task,
+            "user_id": user_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Send to task collaborators and assigned users
+        recipients = set(task.get("collaborators", []) + task.get("assigned_users", []))
+        if task.get("owner_id"):
+            recipients.add(task["owner_id"])
+        
+        for recipient_id in recipients:
+            if recipient_id != user_id:  # Don't send back to the creator
+                await self.send_personal_message(message, recipient_id)
+        
+        # Send to project collaborators if task belongs to a project
+        if task.get("project_id"):
+            await self.send_project_message(message, task["project_id"], exclude_user=user_id)
+
+manager = ConnectionManager()
+
 # Enums
 class TaskStatus(str, Enum):
     TODO = "todo"
