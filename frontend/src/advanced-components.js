@@ -537,7 +537,7 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
           const columnTasks = filteredTasks.filter(task => task.status === column.status);
           
           return (
-            <div key={column.id} className="kanban-column enhanced" style={{ backgroundColor: column.color }}>
+            <DroppableColumn key={column.id} column={column}>
               <div className="kanban-header enhanced">
                 <h3 className="kanban-title">{column.title}</h3>
                 <div className="kanban-stats">
@@ -575,7 +575,7 @@ export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, project
                   <p>Drop tasks here</p>
                 </div>
               )}
-            </div>
+            </DroppableColumn>
           );
         })}
       </DndContext>
