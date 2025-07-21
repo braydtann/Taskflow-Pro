@@ -503,6 +503,7 @@ const TaskManager = ({ initialTab = "tasks" }) => {
   const [editingTask, setEditingTask] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recentlyUpdatedTasks, setRecentlyUpdatedTasks] = useState(new Set());
 
   // WebSocket context for real-time updates
   const { lastMessage, isConnected } = useWebSocketContext();
