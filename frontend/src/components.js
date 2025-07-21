@@ -331,7 +331,7 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate, recent
   };
 
   return (
-    <div className={`task-card ${task.is_timer_running ? 'task-card-timer-active' : ''}`}>
+    <div className={`task-card ${task.is_timer_running ? 'task-card-timer-active' : ''}`} data-task-id={task.id}>
       <div className="task-header">
         <div className="task-title-section">
           <h4 className="task-title">
