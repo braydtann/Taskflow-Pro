@@ -497,10 +497,57 @@ const TaskManager = ({ initialTab = "tasks" }) => {
   const [editingProject, setEditingProject] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // WebSocket context for real-time updates
+  const { lastMessage, isConnected } = useWebSocketContext();
+
   useEffect(() => {
     fetchTasks();
     fetchProjects();
   }, []);
+
+  // Handle real-time task updates
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === 'task_update') {
+      handleRealTimeTaskUpdate(lastMessage);
+    }
+  }, [lastMessage]);
+
+  const handleRealTimeTaskUpdate = (message) => {
+    const { action, task } = message;
+
+    switch (action) {
+      case 'created':
+        // Add new task to the list
+        setTasks(prevTasks => {
+          // Check if task already exists to avoid duplicates
+          const exists = prevTasks.some(t => t.id === task.id);
+          if (!exists) {
+            return [task, ...prevTasks];
+          }
+          return prevTasks;
+        });
+        break;
+
+      case 'updated':
+        // Update existing task
+        setTasks(prevTasks => 
+          prevTasks.map(t => 
+            t.id === task.id ? { ...t, ...task } : t
+          )
+        );
+        break;
+
+      case 'deleted':
+        // Remove task from the list
+        setTasks(prevTasks => 
+          prevTasks.filter(t => t.id !== task.id)
+        );
+        break;
+
+      default:
+        console.log('Unknown task update action:', action);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
