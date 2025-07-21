@@ -746,6 +746,249 @@ async def get_time_tracking_analytics(project_id: Optional[str] = None, current_
         "tasks_analyzed": len(tasks)
     }
 
+# Timer endpoints
+@api_router.post("/tasks/{task_id}/timer/start")
+async def start_task_timer(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Start timer for a task and set status to in_progress"""
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Check if timer is already running
+    if task.get("is_timer_running", False):
+        raise HTTPException(status_code=400, detail="Timer is already running for this task")
+    
+    # Start timer
+    now = datetime.utcnow()
+    update_dict = {
+        "timer_start_time": now,
+        "is_timer_running": True,
+        "status": "in_progress",
+        "updated_at": now
+    }
+    
+    await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
+    updated_task = await db.tasks.find_one({"id": task_id})
+    
+    return {
+        "message": "Timer started successfully",
+        "task": Task(**updated_task),
+        "timer_started_at": now.isoformat()
+    }
+
+@api_router.post("/tasks/{task_id}/timer/pause")
+async def pause_task_timer(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Pause timer for a task (keeps status as in_progress)"""
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Check if timer is running
+    if not task.get("is_timer_running", False):
+        raise HTTPException(status_code=400, detail="Timer is not currently running for this task")
+    
+    # Calculate elapsed time for this session
+    timer_start = task.get("timer_start_time")
+    if not timer_start:
+        raise HTTPException(status_code=400, detail="Timer start time not found")
+    
+    now = datetime.utcnow()
+    if isinstance(timer_start, str):
+        timer_start = datetime.fromisoformat(timer_start.replace('Z', '+00:00'))
+    
+    session_seconds = int((now - timer_start).total_seconds())
+    current_elapsed = task.get("timer_elapsed_seconds", 0)
+    new_elapsed = current_elapsed + session_seconds
+    
+    # Add this session to timer_sessions
+    timer_sessions = task.get("timer_sessions", [])
+    timer_sessions.append({
+        "start_time": timer_start.isoformat(),
+        "end_time": now.isoformat(),
+        "duration_seconds": session_seconds,
+        "session_type": "work"
+    })
+    
+    # Update task
+    update_dict = {
+        "timer_start_time": None,
+        "is_timer_running": False,
+        "timer_elapsed_seconds": new_elapsed,
+        "timer_sessions": timer_sessions,
+        "updated_at": now
+    }
+    
+    await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
+    updated_task = await db.tasks.find_one({"id": task_id})
+    
+    return {
+        "message": "Timer paused successfully",
+        "task": Task(**updated_task),
+        "session_duration_seconds": session_seconds,
+        "total_elapsed_seconds": new_elapsed
+    }
+
+@api_router.post("/tasks/{task_id}/timer/resume")
+async def resume_task_timer(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Resume paused timer for a task"""
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Check if timer is already running
+    if task.get("is_timer_running", False):
+        raise HTTPException(status_code=400, detail="Timer is already running for this task")
+    
+    # Resume timer
+    now = datetime.utcnow()
+    update_dict = {
+        "timer_start_time": now,
+        "is_timer_running": True,
+        "status": "in_progress",  # Ensure status is in_progress
+        "updated_at": now
+    }
+    
+    await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
+    updated_task = await db.tasks.find_one({"id": task_id})
+    
+    return {
+        "message": "Timer resumed successfully",
+        "task": Task(**updated_task),
+        "timer_resumed_at": now.isoformat()
+    }
+
+@api_router.post("/tasks/{task_id}/timer/stop")
+async def stop_task_timer(task_id: str, complete_task: bool = False, current_user: UserInDB = Depends(get_current_active_user)):
+    """Stop timer for a task and optionally complete the task"""
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Check if timer is running
+    if not task.get("is_timer_running", False):
+        raise HTTPException(status_code=400, detail="Timer is not currently running for this task")
+    
+    # Calculate elapsed time for this session
+    timer_start = task.get("timer_start_time")
+    if not timer_start:
+        raise HTTPException(status_code=400, detail="Timer start time not found")
+    
+    now = datetime.utcnow()
+    if isinstance(timer_start, str):
+        timer_start = datetime.fromisoformat(timer_start.replace('Z', '+00:00'))
+    
+    session_seconds = int((now - timer_start).total_seconds())
+    current_elapsed = task.get("timer_elapsed_seconds", 0)
+    new_elapsed = current_elapsed + session_seconds
+    
+    # Add this session to timer_sessions
+    timer_sessions = task.get("timer_sessions", [])
+    timer_sessions.append({
+        "start_time": timer_start.isoformat(),
+        "end_time": now.isoformat(),
+        "duration_seconds": session_seconds,
+        "session_type": "work"
+    })
+    
+    # Update task
+    update_dict = {
+        "timer_start_time": None,
+        "is_timer_running": False,
+        "timer_elapsed_seconds": new_elapsed,
+        "timer_sessions": timer_sessions,
+        "actual_duration": round(new_elapsed / 60),  # Convert to minutes
+        "updated_at": now
+    }
+    
+    # Complete task if requested
+    if complete_task:
+        update_dict["status"] = "completed"
+        update_dict["completed_at"] = now
+        
+        # Update project completed task count
+        if task.get("project_id"):
+            await db.projects.update_one(
+                {"id": task["project_id"]},
+                {"$inc": {"completed_task_count": 1}, "$set": {"updated_at": now}}
+            )
+    
+    await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
+    updated_task = await db.tasks.find_one({"id": task_id})
+    
+    return {
+        "message": f"Timer stopped successfully{' and task completed' if complete_task else ''}",
+        "task": Task(**updated_task),
+        "session_duration_seconds": session_seconds,
+        "total_elapsed_seconds": new_elapsed,
+        "total_elapsed_minutes": round(new_elapsed / 60, 2)
+    }
+
+@api_router.get("/tasks/{task_id}/timer/status")
+async def get_task_timer_status(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Get current timer status for a task"""
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    is_running = task.get("is_timer_running", False)
+    elapsed_seconds = task.get("timer_elapsed_seconds", 0)
+    
+    # Calculate current session time if timer is running
+    current_session_seconds = 0
+    if is_running and task.get("timer_start_time"):
+        timer_start = task["timer_start_time"]
+        if isinstance(timer_start, str):
+            timer_start = datetime.fromisoformat(timer_start.replace('Z', '+00:00'))
+        current_session_seconds = int((datetime.utcnow() - timer_start).total_seconds())
+    
+    total_current_seconds = elapsed_seconds + current_session_seconds
+    
+    return {
+        "task_id": task_id,
+        "is_timer_running": is_running,
+        "timer_start_time": task.get("timer_start_time"),
+        "elapsed_seconds": elapsed_seconds,
+        "current_session_seconds": current_session_seconds,
+        "total_current_seconds": total_current_seconds,
+        "total_current_minutes": round(total_current_seconds / 60, 2),
+        "timer_sessions_count": len(task.get("timer_sessions", []))
+    }
+
 # User Management
 @api_router.get("/users/search")
 async def search_users(query: str, current_user: UserInDB = Depends(get_current_active_user)):
