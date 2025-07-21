@@ -313,8 +313,8 @@ const ProjectForm = ({ project, onSubmit, onCancel }) => {
   );
 };
 
-// Task Card Component
-const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
+// Task Card Component (Updated with Timer)
+const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate }) => {
   const priorityColors = {
     low: "bg-green-100 text-green-800",
     medium: "bg-yellow-100 text-yellow-800",
@@ -330,7 +330,7 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
   };
 
   return (
-    <div className="task-card">
+    <div className={`task-card ${task.is_timer_running ? 'task-card-timer-active' : ''}`}>
       <div className="task-header">
         <div className="task-title-section">
           <h4 className="task-title">{task.title}</h4>
@@ -362,6 +362,15 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
         <p className="task-description">{task.description}</p>
       )}
 
+      {/* Timer Section */}
+      <div className="task-timer-section">
+        <TimerControls 
+          task={task} 
+          onTimerUpdate={onTaskUpdate}
+          compact={true}
+        />
+      </div>
+
       <div className="task-meta">
         {task.project_name && (
           <div className="task-project">
@@ -377,7 +386,16 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
             <svg fill="currentColor" viewBox="0 0 24 24" className="meta-icon">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
-            {task.estimated_duration} min
+            Est: {task.estimated_duration} min
+          </div>
+        )}
+
+        {(task.timer_elapsed_seconds > 0 || task.is_timer_running) && (
+          <div className="task-actual-duration">
+            <svg fill="currentColor" viewBox="0 0 24 24" className="meta-icon">
+              <path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0012 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.11-.74-4.06-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+            </svg>
+            Actual: {Math.round((task.timer_elapsed_seconds || 0) / 60)} min
           </div>
         )}
 
@@ -391,12 +409,12 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
         )}
       </div>
 
-      {(task.owners?.length > 0 || task.collaborators?.length > 0) && (
+      {(task.assigned_users?.length > 0 || task.collaborators?.length > 0) && (
         <div className="task-people">
-          {task.owners?.length > 0 && (
+          {task.assigned_users?.length > 0 && (
             <div className="people-section">
-              <span className="people-label">Owners:</span>
-              <span className="people-list">{task.owners.join(", ")}</span>
+              <span className="people-label">Assigned:</span>
+              <span className="people-list">{task.assigned_users.join(", ")}</span>
             </div>
           )}
           {task.collaborators?.length > 0 && (
