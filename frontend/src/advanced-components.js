@@ -450,6 +450,28 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpd
   );
 };
 
+// Droppable Column Component for Kanban
+const DroppableColumn = ({ column, children }) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: column.id,
+  });
+
+  const style = {
+    backgroundColor: isOver ? '#e0f2fe' : column.color,
+    transition: 'background-color 0.2s',
+  };
+
+  return (
+    <div 
+      ref={setNodeRef}
+      className="kanban-column enhanced" 
+      style={style}
+    >
+      {children}
+    </div>
+  );
+};
+
 // Enhanced Kanban Board with Drag and Drop
 export const EnhancedKanbanBoard = ({ tasks, onTaskUpdate, onTaskDelete, projects, selectedProject, onTaskEdit, onTimerUpdate }) => {
   const sensors = useSensors(
