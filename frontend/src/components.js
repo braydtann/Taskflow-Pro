@@ -534,6 +534,17 @@ const TaskManager = ({ initialTab = "tasks" }) => {
           }
           return prevTasks;
         });
+        
+        // Mark as recently updated
+        setRecentlyUpdatedTasks(prev => new Set([...prev, task.id]));
+        // Remove from recently updated after 5 seconds
+        setTimeout(() => {
+          setRecentlyUpdatedTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+        }, 5000);
         break;
 
       case 'updated':
@@ -543,6 +554,17 @@ const TaskManager = ({ initialTab = "tasks" }) => {
             t.id === task.id ? { ...t, ...task } : t
           )
         );
+        
+        // Mark as recently updated
+        setRecentlyUpdatedTasks(prev => new Set([...prev, task.id]));
+        // Remove from recently updated after 5 seconds
+        setTimeout(() => {
+          setRecentlyUpdatedTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+        }, 5000);
         break;
 
       case 'deleted':
