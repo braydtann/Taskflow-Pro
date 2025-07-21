@@ -406,4 +406,66 @@ function App() {
   );
 }
 
+// Admin Panel Component
+const AdminPanel = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const { user } = useAuth();
+
+  // Check if user is admin
+  if (user?.role !== 'admin') {
+    return (
+      <div className="unauthorized-container">
+        <div className="unauthorized-content">
+          <h2>Access Denied</h2>
+          <p>You don't have permission to access the admin panel.</p>
+          <Link to="/" className="btn btn-primary">Back to Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const adminTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'users', label: 'Users', icon: '👥' },
+    { id: 'teams', label: 'Teams', icon: '🏢' }
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <AdminDashboard />;
+      case 'users':
+        return <UserManagement />;
+      case 'teams':
+        return <TeamManagement />;
+      default:
+        return <AdminDashboard />;
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-header">
+        <h1 className="admin-title">Admin Panel</h1>
+        <div className="admin-nav">
+          {adminTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`admin-tab ${activeTab === tab.id ? 'admin-tab-active' : ''}`}
+            >
+              <span className="admin-tab-icon">{tab.icon}</span>
+              <span className="admin-tab-label">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div className="admin-content">
+        {renderContent()}
+      </div>
+    </div>
+  );
+};
+
 export default App;
