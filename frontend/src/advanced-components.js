@@ -377,6 +377,7 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpd
       {...attributes}
       {...listeners}
       className={`kanban-card draggable ${task.is_timer_running ? 'kanban-card-timer-active' : ''}`}
+      data-task-id={task.id}
     >
       <div className="kanban-card-header">
         <h4 className="kanban-card-title">{task.title}</h4>
