@@ -398,11 +398,13 @@ function App() {
   return (
     <div className="App">
       <AuthProvider>
-        <BrowserRouter>
-          <ProtectedRoute>
-            <AppContent />
-          </ProtectedRoute>
-        </BrowserRouter>
+        <WebSocketProvider>
+          <BrowserRouter>
+            <ProtectedRoute>
+              <AppContent />
+            </ProtectedRoute>
+          </BrowserRouter>
+        </WebSocketProvider>
       </AuthProvider>
     </div>
   );
