@@ -10,6 +10,50 @@ import { WebSocketProvider, useWebSocketContext } from "./websocket";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Real-time Status Indicator Component
+const RealTimeStatus = () => {
+  const { isConnected, taskUpdates } = useWebSocketContext();
+  const [showUpdates, setShowUpdates] = useState(false);
+  
+  return (
+    <div className="realtime-status">
+      <div className="connection-indicator">
+        <div className={`connection-dot ${isConnected ? 'connected' : 'disconnected'}`}></div>
+        <span className="connection-text">
+          {isConnected ? 'Live' : 'Offline'}
+        </span>
+      </div>
+      
+      {taskUpdates.length > 0 && (
+        <div className="updates-indicator">
+          <button 
+            className="updates-badge"
+            onClick={() => setShowUpdates(!showUpdates)}
+            title={`${taskUpdates.length} recent updates`}
+          >
+            {taskUpdates.length}
+          </button>
+          
+          {showUpdates && (
+            <div className="updates-dropdown">
+              <div className="updates-header">Recent Activity</div>
+              {taskUpdates.slice(0, 5).map((update, index) => (
+                <div key={index} className="update-item">
+                  <div className="update-action">{update.action}</div>
+                  <div className="update-task">{update.task.title}</div>
+                  <div className="update-time">
+                    {new Date(update.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Navigation Component (Updated with User Auth)
 const Navigation = () => {
   const location = useLocation();
