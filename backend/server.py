@@ -267,6 +267,7 @@ class UserInDB(UserBase):
     preferences: Dict[str, Any] = {}
     team_ids: List[str] = []  # Teams this user belongs to
     last_login: Optional[datetime] = None
+# Authentication Utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -313,6 +314,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+async def get_current_admin_user(current_user: UserInDB = Depends(get_current_active_user)):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
     return current_user
 
 # Helper functions (updated for user filtering)
