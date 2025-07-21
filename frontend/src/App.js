@@ -5,6 +5,7 @@ import axios from "axios";
 import TaskManager from "./components";
 import { AuthProvider, useAuth, ProtectedRoute, UserProfile } from "./auth";
 import { AdminDashboard, UserManagement, TeamManagement } from "./admin-components";
+import { WebSocketProvider } from "./websocket";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
