@@ -247,91 +247,7 @@ async def get_current_active_user(current_user: UserInDB = Depends(get_current_u
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-class User(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    email: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class Task(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str
-    description: Optional[str] = None
-    status: TaskStatus = TaskStatus.TODO
-    priority: TaskPriority = TaskPriority.MEDIUM
-    project_id: Optional[str] = None
-    project_name: Optional[str] = None
-    todos: List[TodoItem] = []
-    estimated_duration: Optional[int] = None  # in minutes
-    actual_duration: Optional[int] = None  # in minutes
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    due_date: Optional[datetime] = None
-    owners: List[str] = []  # user IDs
-    collaborators: List[str] = []  # user IDs
-    tags: List[str] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
-    time_logs: List[Dict[str, Any]] = []  # Track time spent
-
-class Project(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    description: Optional[str] = None
-    status: ProjectStatus = ProjectStatus.ACTIVE
-    owner_id: str
-    collaborators: List[str] = []
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    task_count: int = 0
-    completed_task_count: int = 0
-
-class PerformanceMetrics(BaseModel):
-    user_id: str
-    date: datetime
-    tasks_completed: int = 0
-    tasks_created: int = 0
-    total_time_spent: int = 0  # in minutes
-    productivity_score: float = 0.0
-    accuracy_score: float = 0.0  # estimated vs actual time accuracy
-
-# Create Models
-class TaskCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    priority: TaskPriority = TaskPriority.MEDIUM
-    project_id: Optional[str] = None
-    estimated_duration: Optional[int] = None
-    due_date: Optional[datetime] = None
-    owners: List[str] = []
-    collaborators: List[str] = []
-    tags: List[str] = []
-
-class TaskUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[TaskStatus] = None
-    priority: Optional[TaskPriority] = None
-    project_id: Optional[str] = None
-    estimated_duration: Optional[int] = None
-    actual_duration: Optional[int] = None
-    due_date: Optional[datetime] = None
-    owners: Optional[List[str]] = None
-    collaborators: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
-
-class ProjectCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    owner_id: str
-    collaborators: List[str] = []
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-
-# Helper functions
+# Helper functions (updated for user filtering)
 async def calculate_productivity_metrics(user_id: str, date: datetime = None):
     """Calculate productivity metrics for a user"""
     if date is None:
@@ -340,17 +256,18 @@ async def calculate_productivity_metrics(user_id: str, date: datetime = None):
     start_date = datetime.combine(date, datetime.min.time())
     end_date = start_date + timedelta(days=1)
     
-    # Get tasks for the day
+    # Get user's tasks for the day
     tasks = await db.tasks.find({
         "$or": [
-            {"owners": user_id},
+            {"owner_id": user_id},
+            {"assigned_users": user_id},
             {"collaborators": user_id}
         ],
         "updated_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
     
     completed_tasks = [t for t in tasks if t.get("status") == "completed"]
-    created_tasks = [t for t in tasks if t.get("created_at", datetime.min) >= start_date]
+    created_tasks = [t for t in tasks if t.get("created_at", datetime.min) >= start_date and t.get("owner_id") == user_id]
     
     # Calculate accuracy score (estimated vs actual duration)
     accuracy_scores = []
@@ -375,8 +292,19 @@ async def calculate_productivity_metrics(user_id: str, date: datetime = None):
         "accuracy_score": round(accuracy_score, 2)
     }
 
-async def get_project_analytics(project_id: str):
-    """Get analytics for a specific project"""
+async def get_project_analytics(project_id: str, user_id: str):
+    """Get analytics for a specific project (user must have access)"""
+    # Verify user has access to this project
+    project = await db.projects.find_one({
+        "id": project_id,
+        "$or": [
+            {"owner_id": user_id},
+            {"collaborators": user_id}
+        ]
+    })
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
     tasks = await db.tasks.find({"project_id": project_id}).to_list(1000)
     
     total_tasks = len(tasks)
@@ -400,19 +328,119 @@ async def get_project_analytics(project_id: str):
         "time_accuracy": round((1 - abs(total_estimated - total_actual) / max(total_estimated, total_actual, 1)) * 100, 2)
     }
 
-# API Routes
-@api_router.get("/")
-async def root():
-    return {"message": "Task Management API v1.0.0"}
-
-# Task endpoints
-@api_router.post("/tasks", response_model=Task)
-async def create_task(task_data: TaskCreate):
-    task_dict = task_data.dict()
+# Authentication Routes
+@api_router.post("/auth/register", response_model=Token)
+async def register(user_data: UserCreate):
+    # Check if user already exists
+    existing_user = await db.users.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]})
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already registered"
+        )
     
-    # Get project name if project_id is provided
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    user_dict = user_data.dict()
+    del user_dict["password"]
+    
+    user = UserInDB(**user_dict, hashed_password=hashed_password)
+    await db.users.insert_one(user.dict())
+    
+    # Create tokens
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"user_id": user.id, "email": user.email}, expires_delta=access_token_expires
+    )
+    refresh_token = create_refresh_token(data={"user_id": user.id, "email": user.email})
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=UserResponse(**user.dict())
+    )
+
+@api_router.post("/auth/login", response_model=Token)
+async def login(user_credentials: UserLogin):
+    user = await db.users.find_one({"email": user_credentials.email})
+    if not user or not verify_password(user_credentials.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=400, detail="Inactive user")
+    
+    # Create tokens
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"user_id": user["id"], "email": user["email"]}, expires_delta=access_token_expires
+    )
+    refresh_token = create_refresh_token(data={"user_id": user["id"], "email": user["email"]})
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=UserResponse(**user)
+    )
+
+@api_router.post("/auth/refresh", response_model=Token)
+async def refresh_token(refresh_token: str):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("user_id")
+        token_type: str = payload.get("type")
+        if user_id is None or token_type != "refresh":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = await db.users.find_one({"id": user_id})
+    if user is None:
+        raise credentials_exception
+    
+    # Create new tokens
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"user_id": user["id"], "email": user["email"]}, expires_delta=access_token_expires
+    )
+    new_refresh_token = create_refresh_token(data={"user_id": user["id"], "email": user["email"]})
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        user=UserResponse(**user)
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: UserInDB = Depends(get_current_active_user)):
+    return UserResponse(**current_user.dict())
+
+# Task endpoints (updated with user filtering)
+@api_router.post("/tasks", response_model=Task)
+async def create_task(task_data: TaskCreate, current_user: UserInDB = Depends(get_current_active_user)):
+    task_dict = task_data.dict()
+    task_dict["owner_id"] = current_user.id
+    
+    # Get project name if project_id is provided and user has access
     if task_dict.get("project_id"):
-        project = await db.projects.find_one({"id": task_dict["project_id"]})
+        project = await db.projects.find_one({
+            "id": task_dict["project_id"],
+            "$or": [
+                {"owner_id": current_user.id},
+                {"collaborators": current_user.id}
+            ]
+        })
         if project:
             task_dict["project_name"] = project["name"]
             # Update project task count
@@ -420,6 +448,8 @@ async def create_task(task_data: TaskCreate):
                 {"id": task_dict["project_id"]},
                 {"$inc": {"task_count": 1}, "$set": {"updated_at": datetime.utcnow()}}
             )
+        else:
+            raise HTTPException(status_code=404, detail="Project not found or access denied")
     
     task = Task(**task_dict)
     await db.tasks.insert_one(task.dict())
@@ -427,36 +457,67 @@ async def create_task(task_data: TaskCreate):
 
 @api_router.get("/tasks", response_model=List[Task])
 async def get_tasks(
+    current_user: UserInDB = Depends(get_current_active_user),
     project_id: Optional[str] = None,
     status: Optional[TaskStatus] = None,
-    priority: Optional[TaskPriority] = None,
-    owner_id: Optional[str] = None
+    priority: Optional[TaskPriority] = None
 ):
-    filter_dict = {}
+    # Base filter - user can only see tasks they own, are assigned to, or collaborate on
+    filter_dict = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }
+    
     if project_id:
+        # Verify user has access to this project
+        project = await db.projects.find_one({
+            "id": project_id,
+            "$or": [
+                {"owner_id": current_user.id},
+                {"collaborators": current_user.id}
+            ]
+        })
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found or access denied")
         filter_dict["project_id"] = project_id
+    
     if status:
         filter_dict["status"] = status
     if priority:
         filter_dict["priority"] = priority
-    if owner_id:
-        filter_dict["$or"] = [{"owners": owner_id}, {"collaborators": owner_id}]
     
     tasks = await db.tasks.find(filter_dict).sort("created_at", -1).to_list(1000)
     return [Task(**task) for task in tasks]
 
 @api_router.get("/tasks/{task_id}", response_model=Task)
-async def get_task(task_id: str):
-    task = await db.tasks.find_one({"id": task_id})
+async def get_task(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
     return Task(**task)
 
 @api_router.put("/tasks/{task_id}", response_model=Task)
-async def update_task(task_id: str, task_update: TaskUpdate):
-    task = await db.tasks.find_one({"id": task_id})
+async def update_task(task_id: str, task_update: TaskUpdate, current_user: UserInDB = Depends(get_current_active_user)):
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
     
     update_dict = {k: v for k, v in task_update.dict().items() if v is not None}
     update_dict["updated_at"] = datetime.utcnow()
@@ -476,10 +537,13 @@ async def update_task(task_id: str, task_update: TaskUpdate):
     return Task(**updated_task)
 
 @api_router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str):
-    task = await db.tasks.find_one({"id": task_id})
+async def delete_task(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "owner_id": current_user.id  # Only owner can delete
+    })
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found or you don't have permission to delete it")
     
     # Update project task count
     if task.get("project_id"):
@@ -491,51 +555,78 @@ async def delete_task(task_id: str):
     await db.tasks.delete_one({"id": task_id})
     return {"message": "Task deleted successfully"}
 
-# Project endpoints
+# Project endpoints (updated with user filtering)
 @api_router.post("/projects", response_model=Project)
-async def create_project(project_data: ProjectCreate):
-    project = Project(**project_data.dict())
+async def create_project(project_data: ProjectCreate, current_user: UserInDB = Depends(get_current_active_user)):
+    project_dict = project_data.dict()
+    project_dict["owner_id"] = current_user.id
+    
+    project = Project(**project_dict)
     await db.projects.insert_one(project.dict())
     return project
 
 @api_router.get("/projects", response_model=List[Project])
-async def get_projects(owner_id: Optional[str] = None):
-    filter_dict = {}
-    if owner_id:
-        filter_dict["$or"] = [{"owner_id": owner_id}, {"collaborators": owner_id}]
+async def get_projects(current_user: UserInDB = Depends(get_current_active_user)):
+    filter_dict = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }
     
     projects = await db.projects.find(filter_dict).sort("created_at", -1).to_list(1000)
     return [Project(**project) for project in projects]
 
 @api_router.get("/projects/{project_id}", response_model=Project)
-async def get_project(project_id: str):
-    project = await db.projects.find_one({"id": project_id})
+async def get_project(project_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    project = await db.projects.find_one({
+        "id": project_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
     return Project(**project)
 
 @api_router.get("/projects/{project_id}/analytics")
-async def get_project_analytics_endpoint(project_id: str):
-    analytics = await get_project_analytics(project_id)
+async def get_project_analytics_endpoint(project_id: str, current_user: UserInDB = Depends(get_current_active_user)):
+    analytics = await get_project_analytics(project_id, current_user.id)
     return analytics
 
-# Analytics endpoints
+# Analytics endpoints (user-specific)
 @api_router.get("/analytics/dashboard")
-async def get_dashboard_analytics(user_id: Optional[str] = None):
-    """Get comprehensive dashboard analytics"""
+async def get_dashboard_analytics(current_user: UserInDB = Depends(get_current_active_user)):
+    """Get comprehensive dashboard analytics for current user"""
     
-    # Get overall task statistics
-    total_tasks = await db.tasks.count_documents({})
-    completed_tasks = await db.tasks.count_documents({"status": "completed"})
-    in_progress_tasks = await db.tasks.count_documents({"status": "in_progress"})
+    # Get user's task statistics
+    user_filter = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }
+    
+    total_tasks = await db.tasks.count_documents(user_filter)
+    completed_tasks = await db.tasks.count_documents({**user_filter, "status": "completed"})
+    in_progress_tasks = await db.tasks.count_documents({**user_filter, "status": "in_progress"})
     overdue_tasks = await db.tasks.count_documents({
+        **user_filter,
         "due_date": {"$lt": datetime.utcnow()},
         "status": {"$ne": "completed"}
     })
     
-    # Get project statistics
-    total_projects = await db.projects.count_documents({})
-    active_projects = await db.projects.count_documents({"status": "active"})
+    # Get user's project statistics
+    project_filter = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }
+    total_projects = await db.projects.count_documents(project_filter)
+    active_projects = await db.projects.count_documents({**project_filter, "status": "active"})
     
     # Get recent productivity metrics
     today = datetime.utcnow().date()
@@ -543,29 +634,7 @@ async def get_dashboard_analytics(user_id: Optional[str] = None):
     
     for days_back in range(7):
         date = today - timedelta(days=days_back)
-        if user_id:
-            metrics = await calculate_productivity_metrics(user_id, date)
-        else:
-            # Get overall metrics for all users
-            metrics = {
-                "tasks_completed": await db.tasks.count_documents({
-                    "status": "completed",
-                    "completed_at": {
-                        "$gte": datetime.combine(date, datetime.min.time()),
-                        "$lt": datetime.combine(date, datetime.min.time()) + timedelta(days=1)
-                    }
-                }),
-                "tasks_created": await db.tasks.count_documents({
-                    "created_at": {
-                        "$gte": datetime.combine(date, datetime.min.time()),
-                        "$lt": datetime.combine(date, datetime.min.time()) + timedelta(days=1)
-                    }
-                }),
-                "total_time_spent": 0,
-                "productivity_score": 0,
-                "accuracy_score": 0
-            }
-        
+        metrics = await calculate_productivity_metrics(current_user.id, date)
         recent_metrics.append({
             "date": date.isoformat(),
             **metrics
@@ -582,11 +651,16 @@ async def get_dashboard_analytics(user_id: Optional[str] = None):
             "active_projects": active_projects
         },
         "productivity_trends": recent_metrics,
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "full_name": current_user.full_name
+        },
         "generated_at": datetime.utcnow().isoformat()
     }
 
-@api_router.get("/analytics/performance/{user_id}")
-async def get_user_performance(user_id: str, days: int = 30):
+@api_router.get("/analytics/performance")
+async def get_user_performance(days: int = 30, current_user: UserInDB = Depends(get_current_active_user)):
     """Get user performance analytics for specified days"""
     end_date = datetime.utcnow().date()
     start_date = end_date - timedelta(days=days)
@@ -594,26 +668,41 @@ async def get_user_performance(user_id: str, days: int = 30):
     performance_data = []
     for i in range(days):
         date = start_date + timedelta(days=i)
-        metrics = await calculate_productivity_metrics(user_id, date)
+        metrics = await calculate_productivity_metrics(current_user.id, date)
         performance_data.append({
             "date": date.isoformat(),
             **metrics
         })
     
     return {
-        "user_id": user_id,
+        "user_id": current_user.id,
         "period_days": days,
         "performance_data": performance_data
     }
 
 @api_router.get("/analytics/time-tracking")
-async def get_time_tracking_analytics(user_id: Optional[str] = None, project_id: Optional[str] = None):
-    """Get time tracking analytics"""
-    filter_dict = {"actual_duration": {"$exists": True, "$ne": None}}
+async def get_time_tracking_analytics(project_id: Optional[str] = None, current_user: UserInDB = Depends(get_current_active_user)):
+    """Get time tracking analytics for current user"""
+    filter_dict = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ],
+        "actual_duration": {"$exists": True, "$ne": None}
+    }
     
-    if user_id:
-        filter_dict["$or"] = [{"owners": user_id}, {"collaborators": user_id}]
     if project_id:
+        # Verify user has access to this project
+        project = await db.projects.find_one({
+            "id": project_id,
+            "$or": [
+                {"owner_id": current_user.id},
+                {"collaborators": current_user.id}
+            ]
+        })
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found or access denied")
         filter_dict["project_id"] = project_id
     
     tasks = await db.tasks.find(filter_dict).to_list(1000)
@@ -650,6 +739,21 @@ async def get_time_tracking_analytics(user_id: Optional[str] = None, project_id:
         "accuracy_percentage": round(accuracy_percentage, 2),
         "tasks_analyzed": len(tasks)
     }
+
+# User Management
+@api_router.get("/users/search")
+async def search_users(query: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Search users by username or email for task assignment"""
+    users = await db.users.find({
+        "$or": [
+            {"username": {"$regex": query, "$options": "i"}},
+            {"email": {"$regex": query, "$options": "i"}},
+            {"full_name": {"$regex": query, "$options": "i"}}
+        ],
+        "is_active": True
+    }).limit(10).to_list(10)
+    
+    return [{"id": user["id"], "username": user["username"], "full_name": user["full_name"], "email": user["email"]} for user in users]
 
 # Include router
 app.include_router(api_router)
