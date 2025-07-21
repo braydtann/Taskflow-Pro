@@ -507,3 +507,321 @@ const UserForm = ({ user, onSubmit, onCancel, title }) => {
     </div>
   );
 };
+
+// Team Management Component
+export const TeamManagement = () => {
+  const [teams, setTeams] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
+
+  useEffect(() => {
+    fetchTeams();
+    fetchUsers();
+  }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/teams`);
+      setTeams(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/users`);
+      setUsers(response.data.filter(user => user.is_active));
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  const handleCreateTeam = async (teamData) => {
+    try {
+      await axios.post(`${API}/admin/teams`, teamData);
+      await fetchTeams();
+      setShowCreateForm(false);
+    } catch (error) {
+      console.error("Error creating team:", error);
+      throw error;
+    }
+  };
+
+  const handleUpdateTeam = async (teamId, teamData) => {
+    try {
+      await axios.put(`${API}/admin/teams/${teamId}`, teamData);
+      await fetchTeams();
+      setEditingTeam(null);
+    } catch (error) {
+      console.error("Error updating team:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+    if (window.confirm("Are you sure you want to delete this team?")) {
+      try {
+        await axios.delete(`${API}/admin/teams/${teamId}`);
+        await fetchTeams();
+      } catch (error) {
+        console.error("Error deleting team:", error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading teams...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="team-management">
+      <div className="management-header">
+        <h1 className="management-title">Team Management</h1>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="btn btn-primary"
+        >
+          <svg fill="currentColor" viewBox="0 0 24 24" className="btn-icon">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+          Create Team
+        </button>
+      </div>
+
+      <div className="teams-grid">
+        {teams.map(team => (
+          <div key={team.id} className="team-card">
+            <div className="team-header">
+              <div className="team-info">
+                <h3 className="team-name">{team.name}</h3>
+                <p className="team-description">{team.description || 'No description'}</p>
+              </div>
+              <div className="team-actions">
+                <button
+                  onClick={() => setEditingTeam(team)}
+                  className="btn btn-sm btn-secondary"
+                  title="Edit team"
+                >
+                  <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDeleteTeam(team.id)}
+                  className="btn btn-sm btn-danger"
+                  title="Delete team"
+                >
+                  <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="team-stats">
+              <div className="team-stat">
+                <div className="stat-number">{team.members?.length || 0}</div>
+                <div className="stat-label">Members</div>
+              </div>
+              <div className="team-stat">
+                <div className="stat-number">{team.projects?.length || 0}</div>
+                <div className="stat-label">Projects</div>
+              </div>
+              <div className="team-stat">
+                <div className="stat-label">Lead</div>
+                <div className="stat-text">
+                  {team.team_lead_id ? 
+                    users.find(u => u.id === team.team_lead_id)?.full_name || 'Unknown' : 
+                    'No lead assigned'
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div className="team-members">
+              <h4 className="members-title">Members ({team.members?.length || 0})</h4>
+              <div className="members-list">
+                {team.members?.length > 0 ? (
+                  team.members.map(memberId => {
+                    const user = users.find(u => u.id === memberId);
+                    return user ? (
+                      <div key={user.id} className="member-item">
+                        <div className="member-avatar">
+                          {user.full_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="member-info">
+                          <div className="member-name">{user.full_name}</div>
+                          <div className="member-role">{user.role}</div>
+                        </div>
+                      </div>
+                    ) : null;
+                  })
+                ) : (
+                  <div className="empty-members">No members assigned</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {teams.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-state-content">
+              <h3>No teams created yet</h3>
+              <p>Create your first team to get started</p>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="btn btn-primary"
+              >
+                Create Team
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {(showCreateForm || editingTeam) && (
+        <TeamForm
+          team={editingTeam}
+          users={users}
+          onSubmit={editingTeam ? 
+            (data) => handleUpdateTeam(editingTeam.id, data) :
+            handleCreateTeam
+          }
+          onCancel={() => {
+            setShowCreateForm(false);
+            setEditingTeam(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Team Form Component
+const TeamForm = ({ team, users, onSubmit, onCancel }) => {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: team?.name || '',
+    description: team?.description || '',
+    team_lead_id: team?.team_lead_id || '',
+    members: team?.members || []
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error("Error submitting team:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMemberToggle = (userId) => {
+    const isSelected = formData.members.includes(userId);
+    const newMembers = isSelected
+      ? formData.members.filter(id => id !== userId)
+      : [...formData.members, userId];
+    
+    setFormData({ ...formData, members: newMembers });
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content team-form-modal">
+        <div className="modal-header">
+          <h2>{team ? 'Edit Team' : 'Create New Team'}</h2>
+          <button onClick={onCancel} className="modal-close">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="team-form">
+          <div className="form-group">
+            <label className="form-label">Team Name *</label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea
+              className="form-textarea"
+              rows="3"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Brief description of the team's purpose..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Team Lead</label>
+            <select
+              className="form-select"
+              value={formData.team_lead_id}
+              onChange={(e) => setFormData({ ...formData, team_lead_id: e.target.value })}
+            >
+              <option value="">Select team lead (optional)</option>
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name} ({user.email})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Team Members</label>
+            <div className="members-selector">
+              {users.map(user => (
+                <div key={user.id} className="member-selector-item">
+                  <input
+                    type="checkbox"
+                    id={`member-${user.id}`}
+                    checked={formData.members.includes(user.id)}
+                    onChange={() => handleMemberToggle(user.id)}
+                  />
+                  <label htmlFor={`member-${user.id}`} className="member-selector-label">
+                    <div className="member-selector-info">
+                      <div className="member-selector-name">{user.full_name}</div>
+                      <div className="member-selector-email">{user.email}</div>
+                      <div className="member-selector-role">{user.role}</div>
+                    </div>
+                  </label>
+                </div>
+              ))}
+            </div>
+            <div className="selected-members-count">
+              {formData.members.length} member{formData.members.length !== 1 ? 's' : ''} selected
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button type="button" onClick={onCancel} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Processing...' : (team ? 'Update Team' : 'Create Team')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
