@@ -661,6 +661,10 @@ async def create_task(task_data: TaskCreate, current_user: UserInDB = Depends(ge
     
     task = Task(**task_dict)
     await db.tasks.insert_one(task.dict())
+    
+    # Broadcast real-time update to collaborators
+    await manager.broadcast_task_update(task.dict(), "created", current_user.id)
+    
     return task
 
 @api_router.get("/tasks", response_model=List[Task])
