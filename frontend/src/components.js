@@ -573,6 +573,17 @@ const TaskManager = ({ initialTab = "tasks" }) => {
     }
   };
 
+  const handleTaskUpdate = async (updatedTask) => {
+    // Update the local state immediately for real-time feedback
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      )
+    );
+    // Optionally refetch from server
+    await fetchTasks();
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
