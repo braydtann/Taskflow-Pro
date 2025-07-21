@@ -1,18 +1,32 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum
+import bcrypt
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Security configuration
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-super-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -20,7 +34,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app
-app = FastAPI(title="Task Management API", version="1.0.0")
+app = FastAPI(title="TaskFlow Pro API", version="2.0.0")
 api_router = APIRouter(prefix="/api")
 
 # Enums
@@ -42,12 +56,196 @@ class ProjectStatus(str, Enum):
     ON_HOLD = "on_hold"
     CANCELLED = "cancelled"
 
-# Models
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+
+# Authentication Models
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str
+    full_name: str
+    role: UserRole = UserRole.USER
+
+class UserCreate(UserBase):
+    password: str
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserInDB(UserBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    avatar_url: Optional[str] = None
+    preferences: Dict[str, Any] = {}
+
+class UserResponse(UserBase):
+    id: str
+    created_at: datetime
+    is_active: bool
+    avatar_url: Optional[str] = None
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    user: UserResponse
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+
+# Task/Project Models (Updated with user ownership)
 class TodoItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     text: str
     completed: bool = False
     completed_at: Optional[datetime] = None
+
+class Task(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: Optional[str] = None
+    status: TaskStatus = TaskStatus.TODO
+    priority: TaskPriority = TaskPriority.MEDIUM
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
+    todos: List[TodoItem] = []
+    estimated_duration: Optional[int] = None  # in minutes
+    actual_duration: Optional[int] = None  # in minutes
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    owner_id: str  # User who owns this task
+    assigned_users: List[str] = []  # User IDs assigned to this task
+    collaborators: List[str] = []  # User IDs collaborating on this task
+    tags: List[str] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    time_logs: List[Dict[str, Any]] = []  # Track time spent
+
+class Project(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    status: ProjectStatus = ProjectStatus.ACTIVE
+    owner_id: str  # User who owns this project
+    collaborators: List[str] = []  # User IDs with access to this project
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    task_count: int = 0
+    completed_task_count: int = 0
+
+class PerformanceMetrics(BaseModel):
+    user_id: str
+    date: datetime
+    tasks_completed: int = 0
+    tasks_created: int = 0
+    total_time_spent: int = 0  # in minutes
+    productivity_score: float = 0.0
+    accuracy_score: float = 0.0  # estimated vs actual time accuracy
+
+# Create/Update Models
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    priority: TaskPriority = TaskPriority.MEDIUM
+    project_id: Optional[str] = None
+    estimated_duration: Optional[int] = None
+    due_date: Optional[datetime] = None
+    assigned_users: List[str] = []
+    collaborators: List[str] = []
+    tags: List[str] = []
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[TaskStatus] = None
+    priority: Optional[TaskPriority] = None
+    project_id: Optional[str] = None
+    estimated_duration: Optional[int] = None
+    actual_duration: Optional[int] = None
+    due_date: Optional[datetime] = None
+    assigned_users: Optional[List[str]] = None
+    collaborators: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    collaborators: List[str] = []
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+# Authentication Utilities
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_refresh_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("user_id")
+        if user_id is None:
+            raise credentials_exception
+        token_data = TokenData(user_id=user_id)
+    except JWTError:
+        raise credentials_exception
+    
+    user = await db.users.find_one({"id": token_data.user_id})
+    if user is None:
+        raise credentials_exception
+    return UserInDB(**user)
+
+async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
 
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
