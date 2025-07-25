@@ -458,6 +458,9 @@ const Dashboard = () => {
           </Link>
         </div>
       </div>
+      
+      {/* Duck Animation - Easter Egg */}
+      <DuckAnimation />
     </div>
   );
 };
