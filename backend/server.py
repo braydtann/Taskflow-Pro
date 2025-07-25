@@ -290,6 +290,31 @@ class ProjectCreate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
+# Subtask Management Models
+class SubtaskCreate(BaseModel):
+    text: str
+    description: Optional[str] = None
+    assigned_users: List[str] = []
+    priority: TaskPriority = TaskPriority.MEDIUM
+    due_date: Optional[datetime] = None
+    estimated_duration: Optional[int] = None
+
+class SubtaskUpdate(BaseModel):
+    text: Optional[str] = None
+    description: Optional[str] = None
+    completed: Optional[bool] = None
+    assigned_users: Optional[List[str]] = None
+    priority: Optional[TaskPriority] = None
+    due_date: Optional[datetime] = None
+    estimated_duration: Optional[int] = None
+    actual_duration: Optional[int] = None
+
+class SubtaskCommentCreate(BaseModel):
+    comment: str
+
+class SubtaskCommentUpdate(BaseModel):
+    comment: str
+
 # Team Management Models
 class Team(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
