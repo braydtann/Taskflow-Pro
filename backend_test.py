@@ -930,16 +930,21 @@ class TaskManagementTester:
         print(f"Cleanup completed")
 
     def run_all_tests(self):
-        """Run all backend tests"""
-        print("🚀 Starting Comprehensive Backend Testing Suite")
+        """Run all backend tests including comprehensive subtask functionality"""
+        print("🚀 Starting Comprehensive Backend Testing Suite - Subtask Management Focus")
         print(f"Backend URL: {BACKEND_URL}")
-        print("=" * 60)
+        print("=" * 80)
         
-        # Test sequence
+        # Test sequence - Authentication first, then subtask functionality
         tests = [
             self.test_api_connectivity,
+            self.test_user_authentication,
             self.test_project_crud,
             self.test_task_crud_with_analytics,
+            self.test_subtask_crud_operations,
+            self.test_subtask_comments_system,
+            self.test_subtask_integration_with_tasks,
+            self.test_subtask_permissions_and_security,
             self.test_analytics_dashboard,
             self.test_project_analytics,
             self.test_performance_metrics,
@@ -958,9 +963,9 @@ class TaskManagementTester:
         self.cleanup_test_data()
         
         # Final results
-        print("\n" + "=" * 60)
-        print("🏁 FINAL TEST RESULTS")
-        print("=" * 60)
+        print("\n" + "=" * 80)
+        print("🏁 FINAL TEST RESULTS - SUBTASK MANAGEMENT TESTING")
+        print("=" * 80)
         print(f"✅ Passed: {self.results['passed']}")
         print(f"❌ Failed: {self.results['failed']}")
         print(f"📊 Success Rate: {(self.results['passed'] / (self.results['passed'] + self.results['failed']) * 100):.1f}%")
