@@ -67,28 +67,34 @@ class TaskManagementTester:
             return False
 
     def test_project_crud(self):
-        """Test Project CRUD operations"""
+        """Test Project CRUD operations with authentication"""
         print("\n=== Testing Project CRUD Operations ===")
+        
+        if not self.test_data['users']:
+            self.log_result("Project CRUD Setup", False, "No authenticated users available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
         
         # Test Create Project
         project_data = {
-            "name": "Analytics Dashboard Project",
-            "description": "Building comprehensive analytics dashboard for task management",
-            "owner_id": str(uuid.uuid4()),
-            "collaborators": [str(uuid.uuid4())],
+            "name": "Subtask Management System",
+            "description": "Building comprehensive subtask management with comments and collaboration",
+            "collaborators": [user2['token_data']['user']['id']] if user2 != user1 else [],
             "start_date": datetime.utcnow().isoformat(),
             "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat()
         }
         
         try:
-            response = self.session.post(f"{BACKEND_URL}/projects", json=project_data)
+            response = self.session.post(f"{BACKEND_URL}/projects", json=project_data, headers=user1['headers'])
             if response.status_code == 200:
                 project = response.json()
                 self.test_data['projects'].append(project)
                 self.log_result("Create Project", True, f"Created project: {project['name']}")
                 
                 # Test Get Project
-                response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}")
+                response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}", headers=user1['headers'])
                 if response.status_code == 200:
                     retrieved_project = response.json()
                     if retrieved_project['name'] == project_data['name']:
@@ -99,7 +105,7 @@ class TaskManagementTester:
                     self.log_result("Get Project by ID", False, f"HTTP {response.status_code}")
                 
                 # Test Get All Projects
-                response = self.session.get(f"{BACKEND_URL}/projects")
+                response = self.session.get(f"{BACKEND_URL}/projects", headers=user1['headers'])
                 if response.status_code == 200:
                     projects = response.json()
                     if isinstance(projects, list) and len(projects) > 0:
