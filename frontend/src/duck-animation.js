@@ -7,9 +7,12 @@ const DuckAnimation = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [direction, setDirection] = useState('right');
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [targetPosition, setTargetPosition] = useState({ x: 100, y: window.innerHeight - 100 });
+  const [isMoving, setIsMoving] = useState(false);
   const duckRef = useRef(null);
   const animationRef = useRef(null);
   const inactivityTimerRef = useRef(null);
+  const movementTimerRef = useRef(null);
 
   // Activity tracking
   useEffect(() => {
@@ -33,16 +36,16 @@ const DuckAnimation = () => {
     };
   }, [isVisible]);
 
-  // Inactivity timer (5 minutes = 300000ms)
+  // Inactivity timer - reduced to 10 seconds for testing (change back to 300000 for 5 minutes)
   useEffect(() => {
     const checkInactivity = () => {
       const timeSinceLastActivity = Date.now() - lastActivity;
-      if (timeSinceLastActivity >= 300000 && !isVisible) { // 5 minutes
+      if (timeSinceLastActivity >= 10000 && !isVisible) { // 10 seconds for testing
         setIsVisible(true);
-        setPosition({ 
-          x: Math.random() * (window.innerWidth - 100), 
-          y: window.innerHeight - 100 
-        });
+        const startX = Math.random() * (window.innerWidth - 100);
+        const startY = window.innerHeight - 100;
+        setPosition({ x: startX, y: startY });
+        setTargetPosition({ x: startX, y: startY });
       }
     };
 
@@ -55,49 +58,68 @@ const DuckAnimation = () => {
     };
   }, [lastActivity, isVisible]);
 
-  // Duck movement logic
+  // Enhanced duck movement logic
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || isRunning) return;
 
     const moveDuck = () => {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const duckSize = 60;
+      const margin = 50;
+      
+      // Generate a new target position
+      const newTargetX = margin + Math.random() * (screenWidth - duckSize - margin * 2);
+      const newTargetY = margin + Math.random() * (screenHeight - duckSize - margin * 2);
+      
+      setTargetPosition({ x: newTargetX, y: newTargetY });
+      setIsMoving(true);
+      
+      // Update direction based on target
+      if (newTargetX > position.x) {
+        setDirection('right');
+      } else if (newTargetX < position.x) {
+        setDirection('left');
+      }
+    };
+
+    // Move duck every 3-6 seconds
+    const moveInterval = setInterval(moveDuck, 3000 + Math.random() * 3000);
+
+    return () => clearInterval(moveInterval);
+  }, [isVisible, isRunning, position]);
+
+  // Smooth movement towards target
+  useEffect(() => {
+    if (!isVisible || !isMoving) return;
+
+    const smoothMove = () => {
       setPosition(prev => {
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const duckSize = 60;
+        const dx = targetPosition.x - prev.x;
+        const dy = targetPosition.y - prev.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Random movement when not running
-        if (!isRunning) {
-          const moveDistance = 50 + Math.random() * 100;
-          const angle = Math.random() * Math.PI * 2;
-          
-          let newX = prev.x + Math.cos(angle) * moveDistance;
-          let newY = prev.y + Math.sin(angle) * moveDistance;
-          
-          // Keep duck within screen bounds
-          newX = Math.max(0, Math.min(screenWidth - duckSize, newX));
-          newY = Math.max(0, Math.min(screenHeight - duckSize, newY));
-          
-          // Update direction based on movement
-          if (newX > prev.x) {
-            setDirection('right');
-          } else if (newX < prev.x) {
-            setDirection('left');
-          }
-          
-          return { x: newX, y: newY };
+        if (distance < 5) {
+          setIsMoving(false);
+          return targetPosition;
         }
         
-        return prev;
+        const speed = 2;
+        const moveX = (dx / distance) * speed;
+        const moveY = (dy / distance) * speed;
+        
+        return {
+          x: prev.x + moveX,
+          y: prev.y + moveY
+        };
       });
     };
 
-    // Move duck every 2-4 seconds when not running
-    const moveInterval = setInterval(moveDuck, 2000 + Math.random() * 2000);
+    const smoothInterval = setInterval(smoothMove, 50);
+    return () => clearInterval(smoothInterval);
+  }, [isVisible, isMoving, targetPosition]);
 
-    return () => clearInterval(moveInterval);
-  }, [isVisible, isRunning]);
-
-  // Mouse proximity detection
+  // Enhanced mouse proximity detection
   useEffect(() => {
     if (!isVisible) return;
 
@@ -111,20 +133,26 @@ const DuckAnimation = () => {
         Math.pow(mouseX - duckX, 2) + Math.pow(mouseY - duckY, 2)
       );
       
-      if (distance < 120) { // Detection radius
+      if (distance < 150) { // Detection radius
         setIsRunning(true);
+        setIsMoving(false);
         
-        // Calculate escape direction
+        // Calculate multiple escape directions for more realistic movement
         const escapeAngle = Math.atan2(duckY - mouseY, duckX - mouseX);
-        const escapeDistance = 150;
+        const escapeDistance = 200 + Math.random() * 100;
+        
+        // Add some randomness to make it more natural
+        const angleVariation = (Math.random() - 0.5) * 0.8;
+        const finalAngle = escapeAngle + angleVariation;
         
         setPosition(prev => {
-          let newX = prev.x + Math.cos(escapeAngle) * escapeDistance;
-          let newY = prev.y + Math.sin(escapeAngle) * escapeDistance;
+          let newX = prev.x + Math.cos(finalAngle) * escapeDistance;
+          let newY = prev.y + Math.sin(finalAngle) * escapeDistance;
           
-          // Keep within bounds
-          newX = Math.max(0, Math.min(window.innerWidth - 60, newX));
-          newY = Math.max(0, Math.min(window.innerHeight - 60, newY));
+          // Keep within bounds with some padding
+          const padding = 30;
+          newX = Math.max(padding, Math.min(window.innerWidth - 60 - padding, newX));
+          newY = Math.max(padding, Math.min(window.innerHeight - 60 - padding, newY));
           
           // Update direction
           setDirection(newX > prev.x ? 'right' : 'left');
@@ -133,7 +161,10 @@ const DuckAnimation = () => {
         });
         
         // Stop running after a moment
-        setTimeout(() => setIsRunning(false), 1000);
+        setTimeout(() => {
+          setIsRunning(false);
+          setIsMoving(false);
+        }, 1500);
       }
     };
 
@@ -156,11 +187,22 @@ const DuckAnimation = () => {
         zIndex: 1000,
         pointerEvents: 'none',
         transform: direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)',
-        transition: 'left 0.8s ease-out, top 0.8s ease-out, transform 0.3s ease'
+        transition: isRunning ? 'transform 0.3s ease' : 'left 0.8s ease-out, top 0.8s ease-out, transform 0.3s ease'
       }}
     >
-      <div className={`duck ${isRunning ? 'duck-running' : 'duck-walking'}`}>
-        🦆
+      <div className={`duck ${isRunning ? 'duck-running' : (isMoving ? 'duck-walking' : 'duck-idle')}`}>
+        <div className="duck-body">
+          <div className="duck-head">
+            <div className="duck-beak"></div>
+            <div className="duck-eye"></div>
+          </div>
+          <div className="duck-wing"></div>
+          <div className="duck-tail"></div>
+        </div>
+        <div className="duck-legs">
+          <div className="duck-leg duck-leg-left"></div>
+          <div className="duck-leg duck-leg-right"></div>
+        </div>
       </div>
     </div>
   );
