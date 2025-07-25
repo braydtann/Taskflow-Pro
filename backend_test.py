@@ -127,27 +127,29 @@ class TaskManagementTester:
         """Test Task CRUD operations with analytics tracking"""
         print("\n=== Testing Task CRUD with Analytics Tracking ===")
         
-        if not self.test_data['projects']:
-            self.log_result("Task CRUD Setup", False, "No projects available for task creation")
+        if not self.test_data['projects'] or not self.test_data['users']:
+            self.log_result("Task CRUD Setup", False, "No projects or authenticated users available")
             return False
         
         project = self.test_data['projects'][0]
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
         
         # Test Create Task
         task_data = {
-            "title": "Implement Real-time Analytics Engine",
-            "description": "Build comprehensive analytics engine with productivity metrics calculation",
+            "title": "Implement Subtask Management System",
+            "description": "Build comprehensive subtask management with CRUD operations, comments, and user assignments",
             "priority": "high",
             "project_id": project['id'],
             "estimated_duration": 480,  # 8 hours in minutes
             "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
-            "owners": [project['owner_id']],
-            "collaborators": project['collaborators'],
-            "tags": ["analytics", "backend", "high-priority"]
+            "assigned_users": [user1['token_data']['user']['id'], user2['token_data']['user']['id']] if user2 != user1 else [user1['token_data']['user']['id']],
+            "collaborators": [user2['token_data']['user']['id']] if user2 != user1 else [],
+            "tags": ["subtasks", "backend", "high-priority"]
         }
         
         try:
-            response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data)
+            response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data, headers=user1['headers'])
             if response.status_code == 200:
                 task = response.json()
                 self.test_data['tasks'].append(task)
@@ -159,7 +161,7 @@ class TaskManagementTester:
                     self.log_result("Create Task with Project Link", False, "Project name not set correctly")
                 
                 # Test Get Task
-                response = self.session.get(f"{BACKEND_URL}/tasks/{task['id']}")
+                response = self.session.get(f"{BACKEND_URL}/tasks/{task['id']}", headers=user1['headers'])
                 if response.status_code == 200:
                     retrieved_task = response.json()
                     self.log_result("Get Task by ID", True, "Task retrieved successfully")
@@ -171,7 +173,7 @@ class TaskManagementTester:
                     "status": "in_progress",
                     "actual_duration": 120  # 2 hours
                 }
-                response = self.session.put(f"{BACKEND_URL}/tasks/{task['id']}", json=update_data)
+                response = self.session.put(f"{BACKEND_URL}/tasks/{task['id']}", json=update_data, headers=user1['headers'])
                 if response.status_code == 200:
                     updated_task = response.json()
                     if updated_task['status'] == 'in_progress':
@@ -186,7 +188,7 @@ class TaskManagementTester:
                     "status": "completed",
                     "actual_duration": 450  # 7.5 hours
                 }
-                response = self.session.put(f"{BACKEND_URL}/tasks/{task['id']}", json=complete_data)
+                response = self.session.put(f"{BACKEND_URL}/tasks/{task['id']}", json=complete_data, headers=user1['headers'])
                 if response.status_code == 200:
                     completed_task = response.json()
                     if completed_task['status'] == 'completed' and completed_task.get('completed_at'):
@@ -197,7 +199,7 @@ class TaskManagementTester:
                     self.log_result("Complete Task with Analytics", False, f"HTTP {response.status_code}")
                 
                 # Test Get Tasks with Filters
-                response = self.session.get(f"{BACKEND_URL}/tasks?project_id={project['id']}")
+                response = self.session.get(f"{BACKEND_URL}/tasks?project_id={project['id']}", headers=user1['headers'])
                 if response.status_code == 200:
                     project_tasks = response.json()
                     if len(project_tasks) > 0:
