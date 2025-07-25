@@ -25,7 +25,8 @@ class TaskManagementTester:
         self.test_data = {
             'users': [],
             'projects': [],
-            'tasks': []
+            'tasks': [],
+            'subtasks': []
         }
         self.results = {
             'passed': 0,
