@@ -273,14 +273,15 @@ class TaskManagementTester:
         """Test Project Analytics endpoint"""
         print("\n=== Testing Project Analytics ===")
         
-        if not self.test_data['projects']:
-            self.log_result("Project Analytics", False, "No projects available for analytics testing")
+        if not self.test_data['projects'] or not self.test_data['users']:
+            self.log_result("Project Analytics", False, "No projects or authenticated users available")
             return False
         
         project = self.test_data['projects'][0]
+        user1 = self.test_data['users'][0]
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}/analytics")
+            response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}/analytics", headers=user1['headers'])
             if response.status_code == 200:
                 analytics = response.json()
                 
