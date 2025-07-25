@@ -10,9 +10,7 @@ const DuckAnimation = () => {
   const [targetPosition, setTargetPosition] = useState({ x: 100, y: window.innerHeight - 100 });
   const [isMoving, setIsMoving] = useState(false);
   const duckRef = useRef(null);
-  const animationRef = useRef(null);
   const inactivityTimerRef = useRef(null);
-  const movementTimerRef = useRef(null);
 
   // Activity tracking
   useEffect(() => {
