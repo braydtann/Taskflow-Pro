@@ -3,6 +3,8 @@ import axios from "axios";
 import { CalendarView, GanttChart, EnhancedKanbanBoard, SmartScheduling } from './advanced-components';
 import { TimerControls, TimerSummary } from './timer-components';
 import { useWebSocketContext } from './websocket';
+import SubtasksSection from './subtask-components';
+import { useAuth } from './auth';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
