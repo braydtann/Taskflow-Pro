@@ -364,15 +364,16 @@ class TaskManagementTester:
         """Test data relationships and consistency"""
         print("\n=== Testing Data Relationships ===")
         
-        if not self.test_data['projects'] or not self.test_data['tasks']:
+        if not self.test_data['projects'] or not self.test_data['tasks'] or not self.test_data['users']:
             self.log_result("Data Relationships", False, "Insufficient test data")
             return False
         
         project = self.test_data['projects'][0]
+        user1 = self.test_data['users'][0]
         
         try:
             # Get updated project to check task counts
-            response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}")
+            response = self.session.get(f"{BACKEND_URL}/projects/{project['id']}", headers=user1['headers'])
             if response.status_code == 200:
                 updated_project = response.json()
                 
