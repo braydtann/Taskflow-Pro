@@ -380,6 +380,497 @@ class TaskManagementTester:
             self.log_result("Data Relationships", False, f"Error: {str(e)}")
             return False
 
+    def test_user_authentication(self):
+        """Test user authentication system"""
+        print("\n=== Testing User Authentication System ===")
+        
+        # Generate unique test users
+        user1_email = f"testuser1_{uuid.uuid4().hex[:8]}@example.com"
+        user2_email = f"testuser2_{uuid.uuid4().hex[:8]}@example.com"
+        
+        # Test User Registration
+        user1_data = {
+            "email": user1_email,
+            "username": f"testuser1_{uuid.uuid4().hex[:6]}",
+            "full_name": "Test User One",
+            "password": "SecurePass123!"
+        }
+        
+        user2_data = {
+            "email": user2_email,
+            "username": f"testuser2_{uuid.uuid4().hex[:6]}",
+            "full_name": "Test User Two", 
+            "password": "SecurePass456!"
+        }
+        
+        try:
+            # Register User 1
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=user1_data)
+            if response.status_code == 200:
+                user1_token_data = response.json()
+                self.test_data['users'].append({
+                    'user_data': user1_data,
+                    'token_data': user1_token_data,
+                    'headers': {'Authorization': f"Bearer {user1_token_data['access_token']}"}
+                })
+                self.log_result("User 1 Registration", True, f"User registered: {user1_data['username']}")
+            else:
+                self.log_result("User 1 Registration", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Register User 2
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=user2_data)
+            if response.status_code == 200:
+                user2_token_data = response.json()
+                self.test_data['users'].append({
+                    'user_data': user2_data,
+                    'token_data': user2_token_data,
+                    'headers': {'Authorization': f"Bearer {user2_token_data['access_token']}"}
+                })
+                self.log_result("User 2 Registration", True, f"User registered: {user2_data['username']}")
+            else:
+                self.log_result("User 2 Registration", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test Login
+            login_data = {"email": user1_email, "password": user1_data['password']}
+            response = self.session.post(f"{BACKEND_URL}/auth/login", json=login_data)
+            if response.status_code == 200:
+                login_token_data = response.json()
+                self.log_result("User Login", True, "Login successful with JWT token")
+            else:
+                self.log_result("User Login", False, f"HTTP {response.status_code}: {response.text}")
+            
+            return True
+        except Exception as e:
+            self.log_result("User Authentication", False, f"Error: {str(e)}")
+            return False
+
+    def test_subtask_crud_operations(self):
+        """Test Subtask CRUD Operations"""
+        print("\n=== Testing Subtask CRUD Operations ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Subtask CRUD Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
+        task = self.test_data['tasks'][0]
+        
+        try:
+            # Test Create Subtask
+            subtask_data = {
+                "text": "Implement user authentication middleware",
+                "description": "Add JWT token validation and user context extraction",
+                "assigned_users": [user1['token_data']['user']['id'], user2['token_data']['user']['id']],
+                "priority": "high",
+                "due_date": (datetime.utcnow() + timedelta(days=3)).isoformat(),
+                "estimated_duration": 120  # 2 hours
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks",
+                json=subtask_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                subtask = response.json()
+                self.test_data['subtasks'] = [subtask]
+                self.log_result("Create Subtask", True, f"Subtask created: {subtask['text']}")
+                
+                # Verify assigned usernames were populated
+                if len(subtask.get('assigned_usernames', [])) == 2:
+                    self.log_result("Subtask User Assignment", True, "Assigned usernames populated correctly")
+                else:
+                    self.log_result("Subtask User Assignment", False, "Assigned usernames not populated")
+            else:
+                self.log_result("Create Subtask", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test Update Subtask
+            subtask_id = subtask['id']
+            update_data = {
+                "text": "Implement enhanced JWT authentication middleware",
+                "completed": True,
+                "actual_duration": 90,  # 1.5 hours
+                "priority": "urgent"
+            }
+            
+            response = self.session.put(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}",
+                json=update_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                updated_subtask = response.json()
+                if updated_subtask['completed'] and updated_subtask['completed_at']:
+                    self.log_result("Update Subtask", True, "Subtask updated and marked completed")
+                else:
+                    self.log_result("Update Subtask", False, "Subtask completion not tracked properly")
+            else:
+                self.log_result("Update Subtask", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # Test Permission-based Access (User 2 should be able to access as assigned user)
+            response = self.session.put(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}",
+                json={"text": "Updated by assigned user"},
+                headers=user2['headers']
+            )
+            
+            if response.status_code == 200:
+                self.log_result("Subtask Access by Assigned User", True, "Assigned user can update subtask")
+            else:
+                self.log_result("Subtask Access by Assigned User", False, f"HTTP {response.status_code}")
+            
+            # Test Delete Subtask
+            response = self.session.delete(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}",
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                self.log_result("Delete Subtask", True, "Subtask deleted successfully")
+            else:
+                self.log_result("Delete Subtask", False, f"HTTP {response.status_code}: {response.text}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Subtask CRUD Operations", False, f"Error: {str(e)}")
+            return False
+
+    def test_subtask_comments_system(self):
+        """Test Subtask Comments System"""
+        print("\n=== Testing Subtask Comments System ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Subtask Comments Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
+        task = self.test_data['tasks'][0]
+        
+        try:
+            # First create a subtask for comments testing
+            subtask_data = {
+                "text": "Design database schema for comments",
+                "description": "Create MongoDB schema for subtask comments with threading support",
+                "assigned_users": [user1['token_data']['user']['id']],
+                "priority": "medium"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks",
+                json=subtask_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code != 200:
+                self.log_result("Subtask Comments Setup", False, "Could not create subtask for comments testing")
+                return False
+            
+            subtask = response.json()
+            subtask_id = subtask['id']
+            
+            # Test Add Comment
+            comment_data = {"comment": "I think we should use a nested document structure for better performance"}
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments",
+                json=comment_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                comment = response.json()
+                comment_id = comment['id']
+                self.log_result("Add Subtask Comment", True, f"Comment added by {comment['username']}")
+                
+                # Verify comment structure
+                if comment['user_id'] == user1['token_data']['user']['id'] and comment['username']:
+                    self.log_result("Comment User Attribution", True, "Comment properly attributed to user")
+                else:
+                    self.log_result("Comment User Attribution", False, "Comment attribution incorrect")
+            else:
+                self.log_result("Add Subtask Comment", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test Add Second Comment (from different user)
+            if user2 != user1:
+                comment2_data = {"comment": "Good point! Let's also consider indexing strategies for better query performance"}
+                
+                response = self.session.post(
+                    f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments",
+                    json=comment2_data,
+                    headers=user2['headers']
+                )
+                
+                if response.status_code == 200:
+                    comment2 = response.json()
+                    self.log_result("Multi-user Comments", True, "Multiple users can add comments")
+                else:
+                    self.log_result("Multi-user Comments", False, f"HTTP {response.status_code}")
+            
+            # Test Update Comment (only by comment author)
+            update_comment_data = {"comment": "Updated: I think we should use a nested document structure with proper indexing for optimal performance"}
+            
+            response = self.session.put(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments/{comment_id}",
+                json=update_comment_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                updated_comment = response.json()
+                if updated_comment['comment'] == update_comment_data['comment']:
+                    self.log_result("Update Comment by Author", True, "Comment author can update their comment")
+                else:
+                    self.log_result("Update Comment by Author", False, "Comment not updated properly")
+            else:
+                self.log_result("Update Comment by Author", False, f"HTTP {response.status_code}")
+            
+            # Test Update Comment Permission (different user should be denied)
+            if user2 != user1:
+                response = self.session.put(
+                    f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments/{comment_id}",
+                    json={"comment": "Trying to update someone else's comment"},
+                    headers=user2['headers']
+                )
+                
+                if response.status_code == 403:
+                    self.log_result("Comment Update Permission", True, "Non-author cannot update comment (403 Forbidden)")
+                else:
+                    self.log_result("Comment Update Permission", False, f"Expected 403, got {response.status_code}")
+            
+            # Test Delete Comment (only by comment author)
+            response = self.session.delete(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments/{comment_id}",
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                self.log_result("Delete Comment by Author", True, "Comment author can delete their comment")
+            else:
+                self.log_result("Delete Comment by Author", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Subtask Comments System", False, f"Error: {str(e)}")
+            return False
+
+    def test_subtask_integration_with_tasks(self):
+        """Test Subtask Integration with Task System"""
+        print("\n=== Testing Subtask Integration with Task System ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Subtask Integration Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        task = self.test_data['tasks'][0]
+        
+        try:
+            # Create multiple subtasks
+            subtasks_data = [
+                {
+                    "text": "Set up authentication routes",
+                    "description": "Implement login, register, and token refresh endpoints",
+                    "priority": "high",
+                    "estimated_duration": 60
+                },
+                {
+                    "text": "Implement password validation",
+                    "description": "Add strong password requirements and validation",
+                    "priority": "medium",
+                    "estimated_duration": 30
+                },
+                {
+                    "text": "Add JWT middleware",
+                    "description": "Create middleware for token validation",
+                    "priority": "high",
+                    "estimated_duration": 90
+                }
+            ]
+            
+            created_subtasks = []
+            for subtask_data in subtasks_data:
+                response = self.session.post(
+                    f"{BACKEND_URL}/tasks/{task['id']}/subtasks",
+                    json=subtask_data,
+                    headers=user1['headers']
+                )
+                
+                if response.status_code == 200:
+                    created_subtasks.append(response.json())
+            
+            if len(created_subtasks) == 3:
+                self.log_result("Multiple Subtasks Creation", True, "Created 3 subtasks successfully")
+            else:
+                self.log_result("Multiple Subtasks Creation", False, f"Expected 3 subtasks, created {len(created_subtasks)}")
+            
+            # Test Task Retrieval with Embedded Subtasks
+            response = self.session.get(f"{BACKEND_URL}/tasks/{task['id']}", headers=user1['headers'])
+            
+            if response.status_code == 200:
+                updated_task = response.json()
+                task_subtasks = updated_task.get('todos', [])
+                
+                if len(task_subtasks) >= 3:
+                    self.log_result("Task with Embedded Subtasks", True, f"Task contains {len(task_subtasks)} subtasks")
+                    
+                    # Verify subtask data structure
+                    first_subtask = task_subtasks[0]
+                    required_fields = ['id', 'text', 'completed', 'priority', 'created_at', 'created_by']
+                    
+                    if all(field in first_subtask for field in required_fields):
+                        self.log_result("Subtask Data Structure", True, "Subtasks have all required fields")
+                    else:
+                        missing = [f for f in required_fields if f not in first_subtask]
+                        self.log_result("Subtask Data Structure", False, f"Missing fields: {missing}")
+                else:
+                    self.log_result("Task with Embedded Subtasks", False, f"Expected >= 3 subtasks, found {len(task_subtasks)}")
+            else:
+                self.log_result("Task with Embedded Subtasks", False, f"HTTP {response.status_code}")
+            
+            # Test Subtask Completion Impact on Task Analytics
+            if created_subtasks:
+                subtask_id = created_subtasks[0]['id']
+                
+                # Complete a subtask
+                response = self.session.put(
+                    f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}",
+                    json={"completed": True, "actual_duration": 45},
+                    headers=user1['headers']
+                )
+                
+                if response.status_code == 200:
+                    self.log_result("Subtask Completion", True, "Subtask marked as completed")
+                    
+                    # Verify task was updated
+                    response = self.session.get(f"{BACKEND_URL}/tasks/{task['id']}", headers=user1['headers'])
+                    if response.status_code == 200:
+                        updated_task = response.json()
+                        completed_subtasks = [s for s in updated_task.get('todos', []) if s.get('completed')]
+                        
+                        if len(completed_subtasks) >= 1:
+                            self.log_result("Task Analytics Update", True, "Task analytics reflect subtask completion")
+                        else:
+                            self.log_result("Task Analytics Update", False, "Task analytics not updated")
+                else:
+                    self.log_result("Subtask Completion", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Subtask Integration", False, f"Error: {str(e)}")
+            return False
+
+    def test_subtask_permissions_and_security(self):
+        """Test Subtask Permissions and Security"""
+        print("\n=== Testing Subtask Permissions and Security ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Subtask Security Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
+        task = self.test_data['tasks'][0]
+        
+        try:
+            # Create a subtask as user1 (task owner/collaborator)
+            subtask_data = {
+                "text": "Security testing subtask",
+                "description": "Test permissions and access control",
+                "assigned_users": [user1['token_data']['user']['id']],
+                "priority": "medium"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks",
+                json=subtask_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                subtask = response.json()
+                subtask_id = subtask['id']
+                self.log_result("Subtask Creation by Authorized User", True, "Task collaborator can create subtasks")
+            else:
+                self.log_result("Subtask Creation by Authorized User", False, f"HTTP {response.status_code}")
+                return False
+            
+            # Test unauthorized access (no token)
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks",
+                json=subtask_data
+            )
+            
+            if response.status_code in [401, 403]:
+                self.log_result("Unauthorized Subtask Creation", True, "Unauthenticated requests properly blocked")
+            else:
+                self.log_result("Unauthorized Subtask Creation", False, f"Expected 401/403, got {response.status_code}")
+            
+            # Test access to non-existent task
+            fake_task_id = str(uuid.uuid4())
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{fake_task_id}/subtasks",
+                json=subtask_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 404:
+                self.log_result("Non-existent Task Access", True, "Returns 404 for non-existent task")
+            else:
+                self.log_result("Non-existent Task Access", False, f"Expected 404, got {response.status_code}")
+            
+            # Test access to non-existent subtask
+            fake_subtask_id = str(uuid.uuid4())
+            response = self.session.put(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{fake_subtask_id}",
+                json={"text": "Updated text"},
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 404:
+                self.log_result("Non-existent Subtask Access", True, "Returns 404 for non-existent subtask")
+            else:
+                self.log_result("Non-existent Subtask Access", False, f"Expected 404, got {response.status_code}")
+            
+            # Test comment permissions
+            comment_data = {"comment": "Test comment for permissions"}
+            response = self.session.post(
+                f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments",
+                json=comment_data,
+                headers=user1['headers']
+            )
+            
+            if response.status_code == 200:
+                comment = response.json()
+                comment_id = comment['id']
+                self.log_result("Comment Creation by Authorized User", True, "Authorized user can add comments")
+                
+                # Test comment deletion by unauthorized user (if we have user2)
+                if user2 != user1:
+                    response = self.session.delete(
+                        f"{BACKEND_URL}/tasks/{task['id']}/subtasks/{subtask_id}/comments/{comment_id}",
+                        headers=user2['headers']
+                    )
+                    
+                    if response.status_code == 403:
+                        self.log_result("Comment Deletion Permission", True, "Non-author cannot delete comment")
+                    else:
+                        self.log_result("Comment Deletion Permission", False, f"Expected 403, got {response.status_code}")
+            else:
+                self.log_result("Comment Creation by Authorized User", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Subtask Permissions", False, f"Error: {str(e)}")
+            return False
+
     def test_error_handling(self):
         """Test API error handling"""
         print("\n=== Testing Error Handling ===")
