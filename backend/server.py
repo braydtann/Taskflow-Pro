@@ -859,6 +859,337 @@ async def delete_task(task_id: str, current_user: UserInDB = Depends(get_current
     await db.tasks.delete_one({"id": task_id})
     return {"message": "Task deleted successfully"}
 
+# Subtask Management Endpoints
+@api_router.post("/tasks/{task_id}/subtasks", response_model=TodoItem)
+async def create_subtask(
+    task_id: str, 
+    subtask_data: SubtaskCreate, 
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Get usernames for assigned users
+    assigned_usernames = []
+    if subtask_data.assigned_users:
+        assigned_users = await db.users.find(
+            {"id": {"$in": subtask_data.assigned_users}}
+        ).to_list(100)
+        assigned_usernames = [user["username"] for user in assigned_users]
+    
+    # Create subtask
+    subtask_dict = subtask_data.dict()
+    subtask_dict["created_by"] = current_user.id
+    subtask_dict["assigned_usernames"] = assigned_usernames
+    
+    subtask = TodoItem(**subtask_dict)
+    
+    # Add subtask to task's todos array
+    await db.tasks.update_one(
+        {"id": task_id},
+        {
+            "$push": {"todos": subtask.dict()},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    # Get updated task and broadcast change
+    updated_task = await db.tasks.find_one({"id": task_id})
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return subtask
+
+@api_router.put("/tasks/{task_id}/subtasks/{subtask_id}", response_model=TodoItem)
+async def update_subtask(
+    task_id: str,
+    subtask_id: str,
+    subtask_update: SubtaskUpdate,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Find the subtask
+    subtask_index = -1
+    current_subtask = None
+    for i, todo in enumerate(task.get("todos", [])):
+        if todo["id"] == subtask_id:
+            subtask_index = i
+            current_subtask = todo
+            break
+    
+    if subtask_index == -1:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    
+    # Prepare update data
+    update_dict = {k: v for k, v in subtask_update.dict().items() if v is not None}
+    update_dict["updated_at"] = datetime.utcnow()
+    
+    # Handle completion
+    if update_dict.get("completed") and not current_subtask.get("completed"):
+        update_dict["completed_at"] = datetime.utcnow()
+    elif update_dict.get("completed") is False:
+        update_dict["completed_at"] = None
+    
+    # Get usernames for assigned users if being updated
+    if "assigned_users" in update_dict and update_dict["assigned_users"]:
+        assigned_users = await db.users.find(
+            {"id": {"$in": update_dict["assigned_users"]}}
+        ).to_list(100)
+        update_dict["assigned_usernames"] = [user["username"] for user in assigned_users]
+    elif "assigned_users" in update_dict and not update_dict["assigned_users"]:
+        update_dict["assigned_usernames"] = []
+    
+    # Update the subtask in the array
+    update_operations = {}
+    for key, value in update_dict.items():
+        update_operations[f"todos.{subtask_index}.{key}"] = value
+    
+    await db.tasks.update_one(
+        {"id": task_id},
+        {"$set": {**update_operations, "updated_at": datetime.utcnow()}}
+    )
+    
+    # Get updated task and broadcast change
+    updated_task = await db.tasks.find_one({"id": task_id})
+    
+    # Find and return the updated subtask
+    updated_subtask = None
+    for todo in updated_task.get("todos", []):
+        if todo["id"] == subtask_id:
+            updated_subtask = TodoItem(**todo)
+            break
+    
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return updated_subtask
+
+@api_router.delete("/tasks/{task_id}/subtasks/{subtask_id}")
+async def delete_subtask(
+    task_id: str,
+    subtask_id: str,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Remove subtask from todos array
+    result = await db.tasks.update_one(
+        {"id": task_id},
+        {
+            "$pull": {"todos": {"id": subtask_id}},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    
+    # Get updated task and broadcast change
+    updated_task = await db.tasks.find_one({"id": task_id})
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return {"message": "Subtask deleted successfully"}
+
+# Subtask Comments Endpoints
+@api_router.post("/tasks/{task_id}/subtasks/{subtask_id}/comments", response_model=SubtaskComment)
+async def add_subtask_comment(
+    task_id: str,
+    subtask_id: str,
+    comment_data: SubtaskCommentCreate,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Find the subtask
+    subtask_index = -1
+    for i, todo in enumerate(task.get("todos", [])):
+        if todo["id"] == subtask_id:
+            subtask_index = i
+            break
+    
+    if subtask_index == -1:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    
+    # Create comment
+    comment = SubtaskComment(
+        user_id=current_user.id,
+        username=current_user.username,
+        comment=comment_data.comment
+    )
+    
+    # Add comment to subtask
+    await db.tasks.update_one(
+        {"id": task_id},
+        {
+            "$push": {f"todos.{subtask_index}.comments": comment.dict()},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    # Get updated task and broadcast change
+    updated_task = await db.tasks.find_one({"id": task_id})
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return comment
+
+@api_router.put("/tasks/{task_id}/subtasks/{subtask_id}/comments/{comment_id}", response_model=SubtaskComment)
+async def update_subtask_comment(
+    task_id: str,
+    subtask_id: str,
+    comment_id: str,
+    comment_update: SubtaskCommentUpdate,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Find the subtask and comment
+    subtask_index = -1
+    comment_index = -1
+    current_comment = None
+    
+    for i, todo in enumerate(task.get("todos", [])):
+        if todo["id"] == subtask_id:
+            subtask_index = i
+            for j, comment in enumerate(todo.get("comments", [])):
+                if comment["id"] == comment_id:
+                    comment_index = j
+                    current_comment = comment
+                    break
+            break
+    
+    if subtask_index == -1:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    if comment_index == -1:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    # Verify user owns the comment
+    if current_comment["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own comments")
+    
+    # Update comment
+    await db.tasks.update_one(
+        {"id": task_id},
+        {
+            "$set": {
+                f"todos.{subtask_index}.comments.{comment_index}.comment": comment_update.comment,
+                f"todos.{subtask_index}.comments.{comment_index}.updated_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Get updated task and find the updated comment
+    updated_task = await db.tasks.find_one({"id": task_id})
+    updated_comment = updated_task["todos"][subtask_index]["comments"][comment_index]
+    
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return SubtaskComment(**updated_comment)
+
+@api_router.delete("/tasks/{task_id}/subtasks/{subtask_id}/comments/{comment_id}")
+async def delete_subtask_comment(
+    task_id: str,
+    subtask_id: str,
+    comment_id: str,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    # Verify user has access to the task
+    task = await db.tasks.find_one({
+        "id": task_id,
+        "$or": [
+            {"owner_id": current_user.id},
+            {"assigned_users": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    })
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or access denied")
+    
+    # Find the subtask and comment to verify ownership
+    subtask_index = -1
+    comment_to_delete = None
+    
+    for i, todo in enumerate(task.get("todos", [])):
+        if todo["id"] == subtask_id:
+            subtask_index = i
+            for comment in todo.get("comments", []):
+                if comment["id"] == comment_id:
+                    comment_to_delete = comment
+                    break
+            break
+    
+    if subtask_index == -1:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+    if not comment_to_delete:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    # Verify user owns the comment
+    if comment_to_delete["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own comments")
+    
+    # Remove comment from subtask
+    await db.tasks.update_one(
+        {"id": task_id},
+        {
+            "$pull": {f"todos.{subtask_index}.comments": {"id": comment_id}},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    # Get updated task and broadcast change
+    updated_task = await db.tasks.find_one({"id": task_id})
+    await manager.broadcast_task_update(updated_task, "updated", current_user.id)
+    
+    return {"message": "Comment deleted successfully"}
+
 # Project endpoints (updated with user filtering)
 @api_router.post("/projects", response_model=Project)
 async def create_project(project_data: ProjectCreate, current_user: UserInDB = Depends(get_current_active_user)):
