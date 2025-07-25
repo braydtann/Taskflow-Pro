@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
 # Configuration
-BACKEND_URL = "https://5dc9bda8-f77f-4ebb-a8cf-c1393001bfb1.preview.emergentagent.com/api"
+BACKEND_URL = "https://c8100f3d-9630-4d28-8ec8-815398f88ad4.preview.emergentagent.com/api"
 WEBSOCKET_URL = "wss://5f9f27c3-39df-42c0-9993-777740083949.preview.emergentagent.com/ws"
 TIMEOUT = 30
 
