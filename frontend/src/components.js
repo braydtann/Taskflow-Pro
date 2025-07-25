@@ -318,6 +318,27 @@ const ProjectForm = ({ project, onSubmit, onCancel }) => {
 
 // Task Card Component (Updated with Timer and Real-time Indicators)
 const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate, recentlyUpdated }) => {
+  const [users, setUsers] = useState([]);
+  const { user: currentUser } = useAuth();
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('auth') ? JSON.parse(localStorage.getItem('auth')).token : null;
+      if (!token) return;
+
+      const response = await axios.get(`${API}/users/search?q=`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const priorityColors = {
     low: "bg-green-100 text-green-800",
     medium: "bg-yellow-100 text-yellow-800",
@@ -435,6 +456,14 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpdate, recent
           )}
         </div>
       )}
+
+      {/* Subtasks Section */}
+      <SubtasksSection 
+        task={task}
+        onTaskUpdate={onTaskUpdate}
+        users={users}
+        currentUserId={currentUser?.id}
+      />
 
       <div className="task-status-controls">
         <select
