@@ -177,12 +177,32 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
     email: Optional[str] = None
 
-# Task/Project Models (Updated with user ownership)
+# Subtask Comment Model
+class SubtaskComment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str  # For easy display
+    comment: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Enhanced TodoItem (Subtask) Model
 class TodoItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     text: str
+    description: Optional[str] = None
     completed: bool = False
     completed_at: Optional[datetime] = None
+    assigned_users: List[str] = []  # User IDs assigned to this subtask
+    assigned_usernames: List[str] = []  # Usernames for easy display
+    priority: TaskPriority = TaskPriority.MEDIUM
+    due_date: Optional[datetime] = None
+    estimated_duration: Optional[int] = None  # in minutes
+    actual_duration: Optional[int] = None  # in minutes
+    comments: List[SubtaskComment] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by: str  # User ID who created this subtask
 
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
