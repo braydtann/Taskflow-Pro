@@ -9,78 +9,218 @@
 .duck-container {
   user-select: none;
   cursor: default;
-}
-
-.duck {
-  font-size: 40px;
-  display: inline-block;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
-}
-
-.duck-walking {
-  animation: duck-waddle 1.5s infinite;
-}
-
-.duck-running {
-  animation: duck-run 0.8s infinite;
-}
-
-@keyframes duck-waddle {
-  0% {
-    transform: rotate(0deg) translateY(0px);
-  }
-  25% {
-    transform: rotate(-3deg) translateY(-2px);
-  }
-  50% {
-    transform: rotate(0deg) translateY(0px);
-  }
-  75% {
-    transform: rotate(3deg) translateY(-2px);
-  }
-  100% {
-    transform: rotate(0deg) translateY(0px);
-  }
-}
-
-@keyframes duck-run {
-  0% {
-    transform: rotate(0deg) translateY(0px) scale(1);
-  }
-  25% {
-    transform: rotate(-5deg) translateY(-4px) scale(1.1);
-  }
-  50% {
-    transform: rotate(0deg) translateY(-2px) scale(1);
-  }
-  75% {
-    transform: rotate(5deg) translateY(-4px) scale(1.1);
-  }
-  100% {
-    transform: rotate(0deg) translateY(0px) scale(1);
-  }
-}
-
-/* Duck enters with a bounce */
-.duck-container {
   animation: duck-enter 0.8s ease-out;
 }
 
+.duck {
+  display: inline-block;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.3));
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.duck-idle {
+  animation: duck-idle 3s infinite;
+}
+
+.duck-walking {
+  animation: duck-waddle 1.2s infinite;
+}
+
+.duck-running {
+  animation: duck-run 0.6s infinite;
+}
+
+/* CSS Duck Art */
+.duck-body {
+  position: relative;
+  width: 45px;
+  height: 35px;
+  background: linear-gradient(45deg, #ffffff 0%, #f8f8f8 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 2px solid #e0e0e0;
+  margin: 5px auto;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+.duck-head {
+  position: absolute;
+  top: -15px;
+  left: 8px;
+  width: 28px;
+  height: 25px;
+  background: linear-gradient(45deg, #ffffff 0%, #f8f8f8 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 2px solid #e0e0e0;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.duck-beak {
+  position: absolute;
+  top: 10px;
+  left: -8px;
+  width: 12px;
+  height: 8px;
+  background: linear-gradient(45deg, #ffa500 0%, #ff8c00 100%);
+  border-radius: 50% 10% 50% 10%;
+  border: 1px solid #e67e00;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.duck-eye {
+  position: absolute;
+  top: 8px;
+  left: 5px;
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #000000 30%, #333333 100%);
+  border-radius: 50%;
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.duck-wing {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 15px;
+  background: linear-gradient(45deg, #f0f0f0 0%, #e8e8e8 100%);
+  border-radius: 50% 20% 50% 20%;
+  border: 1px solid #d0d0d0;
+  transform: rotate(-10deg);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.duck-tail {
+  position: absolute;
+  top: 8px;
+  right: -8px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(45deg, #f0f0f0 0%, #e8e8e8 100%);
+  border-radius: 50% 10% 50% 10%;
+  border: 1px solid #d0d0d0;
+  transform: rotate(45deg);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.duck-legs {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 12px;
+}
+
+.duck-leg {
+  position: absolute;
+  width: 3px;
+  height: 10px;
+  background: linear-gradient(180deg, #ffa500 0%, #ff8c00 100%);
+  border-radius: 2px;
+  border: 1px solid #e67e00;
+}
+
+.duck-leg-left {
+  left: 3px;
+}
+
+.duck-leg-right {
+  right: 3px;
+}
+
+.duck-leg::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -2px;
+  width: 7px;
+  height: 4px;
+  background: linear-gradient(45deg, #ffa500 0%, #ff8c00 100%);
+  border-radius: 50% 50% 0 0;
+  border: 1px solid #e67e00;
+}
+
+/* Animations */
+@keyframes duck-idle {
+  0% { transform: rotate(0deg) translateY(0px); }
+  25% { transform: rotate(0.5deg) translateY(-1px); }
+  50% { transform: rotate(0deg) translateY(0px); }
+  75% { transform: rotate(-0.5deg) translateY(-1px); }
+  100% { transform: rotate(0deg) translateY(0px); }
+}
+
+@keyframes duck-waddle {
+  0% { transform: rotate(0deg) translateY(0px); }
+  25% { transform: rotate(-2deg) translateY(-3px); }
+  50% { transform: rotate(0deg) translateY(0px); }
+  75% { transform: rotate(2deg) translateY(-3px); }
+  100% { transform: rotate(0deg) translateY(0px); }
+}
+
+@keyframes duck-run {
+  0% { transform: rotate(0deg) translateY(0px) scale(1); }
+  25% { transform: rotate(-4deg) translateY(-6px) scale(1.05); }
+  50% { transform: rotate(0deg) translateY(-3px) scale(1); }
+  75% { transform: rotate(4deg) translateY(-6px) scale(1.05); }
+  100% { transform: rotate(0deg) translateY(0px) scale(1); }
+}
+
+/* Duck enters with a bounce */
 @keyframes duck-enter {
   0% {
     transform: translateY(100px) scale(0.3);
     opacity: 0;
   }
   60% {
-    transform: translateY(-10px) scale(1.1);
+    transform: translateY(-15px) scale(1.1);
     opacity: 1;
   }
   100% {
     transform: translateY(0px) scale(1);
     opacity: 1;
   }
+}
+
+/* Leg animation during walking */
+.duck-walking .duck-leg-left {
+  animation: leg-step 1.2s infinite;
+}
+
+.duck-walking .duck-leg-right {
+  animation: leg-step 1.2s infinite 0.6s;
+}
+
+.duck-running .duck-leg-left {
+  animation: leg-step 0.6s infinite;
+}
+
+.duck-running .duck-leg-right {
+  animation: leg-step 0.6s infinite 0.3s;
+}
+
+@keyframes leg-step {
+  0% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-10deg); }
+  50% { transform: translateY(0px) rotate(0deg); }
+  75% { transform: translateY(1px) rotate(10deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+/* Wing flapping during running */
+.duck-running .duck-wing {
+  animation: wing-flap 0.6s infinite;
+}
+
+@keyframes wing-flap {
+  0% { transform: rotate(-10deg) scale(1); }
+  50% { transform: rotate(-20deg) scale(1.1); }
+  100% { transform: rotate(-10deg) scale(1); }
 }
 
 body {
