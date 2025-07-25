@@ -3709,3 +3709,406 @@ body {
     min-width: 200px;
   }
 }
+
+/* Subtasks Section Styles */
+.subtasks-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.subtasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.subtasks-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.subtasks-progress {
+  flex: 1;
+  margin: 0 16px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 100%);
+  transition: width 0.3s ease;
+}
+
+/* Add Subtask Form */
+.add-subtask-form {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.add-subtask-form .form-group {
+  margin-bottom: 12px;
+}
+
+.add-subtask-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.add-subtask-form .form-help {
+  font-size: 12px;
+  color: #718096;
+  margin-top: 4px;
+}
+
+/* Subtask Item */
+.subtask-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.subtask-item:hover {
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.subtask-item.completed {
+  opacity: 0.7;
+  background: #f7fafc;
+}
+
+.subtask-main {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+}
+
+.subtask-checkbox-section {
+  margin-right: 12px;
+  padding-top: 2px;
+}
+
+.subtask-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.subtask-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.subtask-text {
+  font-weight: 500;
+  color: #2d3748;
+  margin-right: 8px;
+}
+
+.subtask-text.line-through {
+  text-decoration: line-through;
+  color: #718096;
+}
+
+.subtask-description {
+  font-size: 14px;
+  color: #718096;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.subtask-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.subtask-badges > span {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.priority-badge.priority-low {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.priority-badge.priority-medium {
+  background: #fef5e7;
+  color: #b7791f;
+}
+
+.priority-badge.priority-high {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.priority-badge.priority-urgent {
+  background: #fbb6ce;
+  color: #97266d;
+}
+
+.assigned-badge {
+  background: #bee3f8;
+  color: #2a69ac;
+}
+
+.due-date-badge {
+  background: #faf5ff;
+  color: #6b46c1;
+}
+
+.duration-badge {
+  background: #e6fffa;
+  color: #234e52;
+}
+
+.subtask-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.subtask-action-btn {
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.subtask-action-btn:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.subtask-action-btn.delete:hover {
+  background: #fed7d7;
+  border-color: #fc8181;
+}
+
+/* Subtask Expanded Content */
+.subtask-expanded {
+  border-top: 1px solid #e2e8f0;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.subtask-comments-section {
+  margin-bottom: 16px;
+}
+
+.comments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.comments-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+/* Comment Styles */
+.subtask-comment {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.comment-author {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 13px;
+}
+
+.comment-date {
+  font-size: 11px;
+  color: #718096;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.comment-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.comment-action-btn:hover {
+  background: #f1f5f9;
+}
+
+.comment-action-btn.delete:hover {
+  background: #fed7d7;
+}
+
+.comment-text {
+  color: #4a5568;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.comment-edit {
+  margin-top: 8px;
+}
+
+.comment-edit-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 13px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.comment-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Comment Form */
+.comment-form {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.comment-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 13px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.comment-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.comments-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Subtask Edit Form */
+.subtask-edit-form {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.subtask-edit-form .form-group {
+  margin-bottom: 12px;
+}
+
+.subtask-edit-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.subtask-edit-form .form-help {
+  font-size: 12px;
+  color: #718096;
+  margin-top: 4px;
+}
+
+/* No Subtasks State */
+.no-subtasks {
+  text-align: center;
+  padding: 32px;
+  color: #718096;
+}
+
+.no-subtasks p {
+  margin: 0;
+  font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .subtasks-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .subtasks-progress {
+    margin: 0;
+  }
+  
+  .add-subtask-form .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .subtask-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .subtask-badges {
+    margin: 8px 0;
+  }
+  
+  .subtask-actions {
+    align-self: flex-end;
+  }
+}
