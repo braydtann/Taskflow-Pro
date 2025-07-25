@@ -311,15 +311,15 @@ class TaskManagementTester:
         """Test Performance Metrics APIs"""
         print("\n=== Testing Performance Metrics ===")
         
-        if not self.test_data['projects']:
-            self.log_result("Performance Metrics Setup", False, "No test data available")
+        if not self.test_data['users']:
+            self.log_result("Performance Metrics Setup", False, "No authenticated users available")
             return False
         
-        user_id = self.test_data['projects'][0]['owner_id']
+        user1 = self.test_data['users'][0]
         
         try:
             # Test User Performance Analytics
-            response = self.session.get(f"{BACKEND_URL}/analytics/performance/{user_id}?days=7")
+            response = self.session.get(f"{BACKEND_URL}/analytics/performance?days=7", headers=user1['headers'])
             if response.status_code == 200:
                 performance = response.json()
                 
@@ -341,7 +341,7 @@ class TaskManagementTester:
                 self.log_result("User Performance Analytics", False, f"HTTP {response.status_code}")
             
             # Test Time Tracking Analytics
-            response = self.session.get(f"{BACKEND_URL}/analytics/time-tracking")
+            response = self.session.get(f"{BACKEND_URL}/analytics/time-tracking", headers=user1['headers'])
             if response.status_code == 200:
                 time_analytics = response.json()
                 
