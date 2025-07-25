@@ -4,15 +4,25 @@ Create an admin user for TaskFlow Pro
 """
 import asyncio
 import sys
+import os
+from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
 from datetime import datetime
 import uuid
+from dotenv import load_dotenv
+
+# Load environment variables
+ROOT_DIR = Path(__file__).parent / 'backend'
+load_dotenv(ROOT_DIR / '.env')
 
 async def create_admin_user():
-    # Database connection
-    client = AsyncIOMotorClient('mongodb://localhost:27017')
-    db = client['test_database']
+    # Database connection using environment variables
+    mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+    db_name = os.environ.get('DB_NAME', 'test_database')
+    
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
     
     # Admin user details
     admin_email = "admin@taskflow.com"
@@ -26,7 +36,7 @@ async def create_admin_user():
         print(f"✅ Admin user already exists!")
         print(f"Email: {admin_email}")
         print(f"Password: {admin_password}")
-        await client.close()
+        client.close()
         return
     
     # Hash password
@@ -65,7 +75,7 @@ async def create_admin_user():
     print("3. Once logged in, navigate to /admin to access the admin panel")
     print("4. ⚠️  IMPORTANT: Change the password after first login for security!")
     
-    await client.close()
+    client.close()
 
 if __name__ == "__main__":
     asyncio.run(create_admin_user())
