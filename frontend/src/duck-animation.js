@@ -49,13 +49,6 @@ const DuckAnimation = () => {
         setTargetPosition({ x: startX, y: startY });
       }
     };
-        setIsVisible(true);
-        const startX = Math.random() * (window.innerWidth - 100);
-        const startY = window.innerHeight - 100;
-        setPosition({ x: startX, y: startY });
-        setTargetPosition({ x: startX, y: startY });
-      }
-    };
 
     inactivityTimerRef.current = setInterval(checkInactivity, 1000);
 
