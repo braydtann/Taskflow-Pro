@@ -515,8 +515,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Duck Animation Easter Egg Feature"
+  current_focus: []
   stuck_tasks: 
     - "WebSocket Real-time Communication"
   test_all: false
