@@ -221,8 +221,14 @@ class TaskManagementTester:
         """Test Analytics Dashboard endpoint"""
         print("\n=== Testing Analytics Dashboard ===")
         
+        if not self.test_data['users']:
+            self.log_result("Analytics Dashboard Setup", False, "No authenticated users available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        
         try:
-            response = self.session.get(f"{BACKEND_URL}/analytics/dashboard")
+            response = self.session.get(f"{BACKEND_URL}/analytics/dashboard", headers=user1['headers'])
             if response.status_code == 200:
                 analytics = response.json()
                 
