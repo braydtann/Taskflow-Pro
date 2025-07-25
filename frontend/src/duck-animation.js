@@ -36,11 +36,21 @@ const DuckAnimation = () => {
     };
   }, [isVisible]);
 
-  // Inactivity timer - reduced to 10 seconds for testing (change back to 300000 for 5 minutes)
+  // Inactivity timer (5 minutes = 300000ms, 10 seconds for testing)
   useEffect(() => {
     const checkInactivity = () => {
       const timeSinceLastActivity = Date.now() - lastActivity;
-      if (timeSinceLastActivity >= 10000 && !isVisible) { // 10 seconds for testing
+      // Use 10 seconds for testing, 300000ms (5 minutes) for production
+      const inactivityThreshold = process.env.NODE_ENV === 'development' ? 10000 : 300000;
+      
+      if (timeSinceLastActivity >= inactivityThreshold && !isVisible) {
+        setIsVisible(true);
+        const startX = Math.random() * (window.innerWidth - 100);
+        const startY = window.innerHeight - 100;
+        setPosition({ x: startX, y: startY });
+        setTargetPosition({ x: startX, y: startY });
+      }
+    };
         setIsVisible(true);
         const startX = Math.random() * (window.innerWidth - 100);
         const startY = window.innerHeight - 100;
