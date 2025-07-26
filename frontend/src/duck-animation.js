@@ -21,7 +21,11 @@ const DuckAnimation = () => {
       }
     };
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    // When duck is visible, only track significant activities (not mousemove)
+    // When duck is not visible, track all activities including mousemove
+    const events = isVisible 
+      ? ['mousedown', 'keypress', 'scroll', 'touchstart', 'click']
+      : ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
     events.forEach(event => {
       document.addEventListener(event, updateActivity, true);
