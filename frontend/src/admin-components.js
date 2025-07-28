@@ -662,7 +662,7 @@ export const TeamManagement = () => {
                         </div>
                         <div className="member-info">
                           <div className="member-name">{user.full_name}</div>
-                          <div className="member-role">{user.role}</div>
+                          <div className="member-role">{user.role === 'project_manager' ? 'Project Manager' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}</div>
                         </div>
                       </div>
                     ) : null;
