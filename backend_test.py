@@ -1784,11 +1784,359 @@ class TaskManagementTester:
         except Exception as e:
             self.log_result("Project Status Testing", False, f"Error: {str(e)}")
 
+    def test_user_creation_with_project_manager_role(self):
+        """Test creating users with project_manager role via admin/users endpoint"""
+        print("\n=== Testing User Creation with Project Manager Role ===")
+        
+        # First create an admin user to perform admin operations
+        admin_email = f"admin_{uuid.uuid4().hex[:8]}@taskflow.com"
+        admin_data = {
+            "email": admin_email,
+            "username": f"admin_{uuid.uuid4().hex[:6]}",
+            "full_name": "Test Admin User",
+            "password": "AdminPass123!",
+            "role": "admin"
+        }
+        
+        try:
+            # Register admin user
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=admin_data)
+            if response.status_code == 200:
+                admin_token_data = response.json()
+                admin_headers = {'Authorization': f"Bearer {admin_token_data['access_token']}"}
+                self.log_result("Admin User Registration for Testing", True, f"Admin user registered: {admin_data['username']}")
+            else:
+                self.log_result("Admin User Registration for Testing", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test 1: Create user with project_manager role via admin endpoint
+            pm_user_data = {
+                "email": f"pm_user_{uuid.uuid4().hex[:8]}@taskflow.com",
+                "username": f"pm_user_{uuid.uuid4().hex[:6]}",
+                "full_name": "Test Project Manager User",
+                "password": "PMPass123!",
+                "role": "project_manager",
+                "team_ids": []
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/admin/users", json=pm_user_data, headers=admin_headers)
+            if response.status_code == 200:
+                pm_user = response.json()
+                
+                if pm_user.get('role') == 'project_manager':
+                    self.log_result("Create PM User via Admin Endpoint", True, f"PM user created successfully: {pm_user['username']} with role {pm_user['role']}")
+                    
+                    # Store for later tests
+                    self.test_data['created_pm_user'] = pm_user
+                    self.test_data['created_pm_user_data'] = pm_user_data
+                    self.test_data['admin_headers_for_pm_test'] = admin_headers
+                else:
+                    self.log_result("Create PM User via Admin Endpoint", False, f"Role mismatch: expected 'project_manager', got '{pm_user.get('role')}'")
+            else:
+                self.log_result("Create PM User via Admin Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test 2: Verify user appears in user listings with correct role
+            response = self.session.get(f"{BACKEND_URL}/admin/users", headers=admin_headers)
+            if response.status_code == 200:
+                users = response.json()
+                pm_users = [u for u in users if u.get('role') == 'project_manager']
+                
+                if len(pm_users) > 0:
+                    found_user = next((u for u in pm_users if u['id'] == pm_user['id']), None)
+                    if found_user:
+                        self.log_result("PM User in Admin Listing", True, f"PM user appears correctly in admin user listing with role: {found_user['role']}")
+                    else:
+                        self.log_result("PM User in Admin Listing", False, "Created PM user not found in admin listing")
+                else:
+                    self.log_result("PM User in Admin Listing", False, "No project manager users found in admin listing")
+            else:
+                self.log_result("PM User in Admin Listing", False, f"HTTP {response.status_code}: {response.text}")
+            
+            return True
+        except Exception as e:
+            self.log_result("User Creation with PM Role", False, f"Error: {str(e)}")
+            return False
+
+    def test_pm_user_authentication_and_access(self):
+        """Test PM user authentication and access to PM features"""
+        print("\n=== Testing PM User Authentication and Access ===")
+        
+        if 'created_pm_user_data' not in self.test_data:
+            self.log_result("PM Authentication Setup", False, "No PM user data available from creation test")
+            return False
+        
+        pm_user_data = self.test_data['created_pm_user_data']
+        
+        try:
+            # Test 1: Login with project_manager user
+            login_data = {
+                "email": pm_user_data['email'],
+                "password": pm_user_data['password']
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/auth/login", json=login_data)
+            if response.status_code == 200:
+                pm_token_data = response.json()
+                pm_headers = {'Authorization': f"Bearer {pm_token_data['access_token']}"}
+                
+                if pm_token_data['user']['role'] == 'project_manager':
+                    self.log_result("PM User Login Authentication", True, f"PM user logged in successfully with correct role in JWT token")
+                    self.test_data['pm_test_headers'] = pm_headers
+                    self.test_data['pm_test_token_data'] = pm_token_data
+                else:
+                    self.log_result("PM User Login Authentication", False, f"Role mismatch in JWT: expected 'project_manager', got '{pm_token_data['user']['role']}'")
+            else:
+                self.log_result("PM User Login Authentication", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test 2: Verify access to PM dashboard endpoints
+            pm_endpoints_to_test = [
+                ("/pm/dashboard", "PM Dashboard"),
+                ("/pm/projects", "PM Projects"),
+                ("/pm/activity", "PM Activity Log"),
+                ("/pm/notifications", "PM Notifications")
+            ]
+            
+            for endpoint, name in pm_endpoints_to_test:
+                response = self.session.get(f"{BACKEND_URL}{endpoint}", headers=pm_headers)
+                if response.status_code == 200:
+                    self.log_result(f"PM Access to {name}", True, f"PM user can access {endpoint}")
+                else:
+                    self.log_result(f"PM Access to {name}", False, f"HTTP {response.status_code} for {endpoint}")
+            
+            # Test 3: Verify PM users cannot access admin-only endpoints
+            admin_only_endpoints = [
+                ("/admin/users", "Admin Users Management"),
+                ("/admin/teams", "Admin Teams Management")
+            ]
+            
+            for endpoint, name in admin_only_endpoints:
+                response = self.session.get(f"{BACKEND_URL}{endpoint}", headers=pm_headers)
+                if response.status_code == 403:
+                    self.log_result(f"PM Blocked from {name}", True, f"PM correctly blocked from {endpoint} (403 Forbidden)")
+                else:
+                    self.log_result(f"PM Blocked from {name}", False, f"Expected 403, got {response.status_code} for {endpoint}")
+            
+            # Test 4: Verify JWT tokens work correctly with project_manager role
+            response = self.session.get(f"{BACKEND_URL}/auth/me", headers=pm_headers)
+            if response.status_code == 200:
+                user_info = response.json()
+                if user_info['role'] == 'project_manager':
+                    self.log_result("JWT Token Validation with PM Role", True, "JWT token correctly validates PM role in /auth/me endpoint")
+                else:
+                    self.log_result("JWT Token Validation with PM Role", False, f"JWT validation role mismatch: {user_info['role']}")
+            else:
+                self.log_result("JWT Token Validation with PM Role", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("PM User Authentication and Access", False, f"Error: {str(e)}")
+            return False
+
+    def test_admin_user_management_with_pm_role(self):
+        """Test admin user management endpoints with project_manager role operations"""
+        print("\n=== Testing Admin User Management with PM Role ===")
+        
+        if 'admin_headers_for_pm_test' not in self.test_data:
+            self.log_result("Admin User Management Setup", False, "No admin headers available")
+            return False
+        
+        admin_headers = self.test_data['admin_headers_for_pm_test']
+        
+        try:
+            # Test 1: Verify GET /api/admin/users includes users with project_manager role
+            response = self.session.get(f"{BACKEND_URL}/admin/users", headers=admin_headers)
+            if response.status_code == 200:
+                users = response.json()
+                
+                # Count users by role
+                role_counts = {}
+                for user in users:
+                    role = user.get('role', 'unknown')
+                    role_counts[role] = role_counts.get(role, 0) + 1
+                
+                if 'project_manager' in role_counts and role_counts['project_manager'] > 0:
+                    self.log_result("Admin Users List Includes PM Role", True, 
+                        f"Admin user listing includes {role_counts['project_manager']} project_manager users")
+                else:
+                    self.log_result("Admin Users List Includes PM Role", False, "No project_manager users found in admin listing")
+                
+                # Log all role counts for verification
+                role_summary = ", ".join([f"{role}: {count}" for role, count in role_counts.items()])
+                self.log_result("User Role Distribution", True, f"Role distribution: {role_summary}")
+            else:
+                self.log_result("Admin Users List Includes PM Role", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test 2: Create a regular user and update their role to project_manager
+            regular_user_data = {
+                "email": f"regular_to_pm_{uuid.uuid4().hex[:8]}@taskflow.com",
+                "username": f"regular_to_pm_{uuid.uuid4().hex[:6]}",
+                "full_name": "Regular User to be PM",
+                "password": "RegularPass123!",
+                "role": "user",
+                "team_ids": []
+            }
+            
+            # Create regular user first
+            response = self.session.post(f"{BACKEND_URL}/admin/users", json=regular_user_data, headers=admin_headers)
+            if response.status_code == 200:
+                regular_user = response.json()
+                self.log_result("Create Regular User for Role Update", True, f"Created regular user: {regular_user['username']}")
+                
+                # Test updating role to project_manager
+                update_data = {"role": "project_manager"}
+                response = self.session.put(f"{BACKEND_URL}/admin/users/{regular_user['id']}", 
+                                          json=update_data, headers=admin_headers)
+                if response.status_code == 200:
+                    updated_user = response.json()
+                    if updated_user.get('role') == 'project_manager':
+                        self.log_result("Update User Role to PM", True, 
+                            f"Successfully updated user role from 'user' to 'project_manager'")
+                    else:
+                        self.log_result("Update User Role to PM", False, 
+                            f"Role update failed: expected 'project_manager', got '{updated_user.get('role')}'")
+                else:
+                    self.log_result("Update User Role to PM", False, f"HTTP {response.status_code}: {response.text}")
+            else:
+                self.log_result("Create Regular User for Role Update", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # Test 3: Verify role validation accepts all three roles (user, project_manager, admin)
+            test_roles = ["user", "project_manager", "admin"]
+            role_validation_results = []
+            
+            for role in test_roles:
+                test_user_data = {
+                    "email": f"role_validation_{role}_{uuid.uuid4().hex[:6]}@taskflow.com",
+                    "username": f"role_val_{role}_{uuid.uuid4().hex[:4]}",
+                    "full_name": f"Test {role.replace('_', ' ').title()} User",
+                    "password": "TestPass123!",
+                    "role": role,
+                    "team_ids": []
+                }
+                
+                response = self.session.post(f"{BACKEND_URL}/admin/users", json=test_user_data, headers=admin_headers)
+                if response.status_code == 200:
+                    created_user = response.json()
+                    if created_user.get('role') == role:
+                        role_validation_results.append(f"✅ {role}")
+                    else:
+                        role_validation_results.append(f"❌ {role} (got {created_user.get('role')})")
+                else:
+                    role_validation_results.append(f"❌ {role} (HTTP {response.status_code})")
+            
+            self.log_result("Role Validation for All Three Roles", 
+                all("✅" in result for result in role_validation_results),
+                f"Role validation results: {', '.join(role_validation_results)}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Admin User Management with PM Role", False, f"Error: {str(e)}")
+            return False
+
+    def test_comprehensive_role_based_access_control(self):
+        """Test comprehensive role-based access control across all user types"""
+        print("\n=== Testing Comprehensive Role-Based Access Control ===")
+        
+        try:
+            # Create users with all three roles for comprehensive testing
+            test_users = {}
+            roles_to_test = ["user", "project_manager", "admin"]
+            
+            for role in roles_to_test:
+                user_data = {
+                    "email": f"rbac_test_{role}_{uuid.uuid4().hex[:8]}@taskflow.com",
+                    "username": f"rbac_{role}_{uuid.uuid4().hex[:6]}",
+                    "full_name": f"RBAC Test {role.replace('_', ' ').title()}",
+                    "password": "RBACTest123!",
+                    "role": role
+                }
+                
+                response = self.session.post(f"{BACKEND_URL}/auth/register", json=user_data)
+                if response.status_code == 200:
+                    token_data = response.json()
+                    test_users[role] = {
+                        'headers': {'Authorization': f"Bearer {token_data['access_token']}"},
+                        'user_data': token_data['user']
+                    }
+                    self.log_result(f"RBAC Test User Creation ({role})", True, f"Created {role} user for RBAC testing")
+                else:
+                    self.log_result(f"RBAC Test User Creation ({role})", False, f"HTTP {response.status_code}")
+                    return False
+            
+            # Define access control matrix: (endpoint, user_should_access, pm_should_access, admin_should_access)
+            access_control_matrix = [
+                # Admin-only endpoints
+                ("/admin/users", False, False, True),
+                ("/admin/teams", False, False, True),
+                
+                # PM and Admin endpoints
+                ("/pm/dashboard", False, True, True),
+                ("/pm/projects", False, True, True),
+                ("/pm/activity", False, True, True),
+                ("/pm/notifications", False, True, True),
+                
+                # General user endpoints (all roles should have access)
+                ("/tasks", True, True, True),
+                ("/projects", True, True, True),
+                ("/analytics/dashboard", True, True, True),
+                ("/auth/me", True, True, True),
+            ]
+            
+            access_test_results = []
+            total_tests = 0
+            passed_tests = 0
+            
+            for endpoint, user_access, pm_access, admin_access in access_control_matrix:
+                expected_access = {
+                    'user': user_access,
+                    'project_manager': pm_access,
+                    'admin': admin_access
+                }
+                
+                for role, should_have_access in expected_access.items():
+                    if role in test_users:
+                        total_tests += 1
+                        headers = test_users[role]['headers']
+                        
+                        response = self.session.get(f"{BACKEND_URL}{endpoint}", headers=headers)
+                        
+                        if should_have_access:
+                            # Should have access (200 or other success codes)
+                            if response.status_code in [200, 201]:
+                                access_test_results.append(f"✅ {role.upper()} → {endpoint}: Correct access (HTTP {response.status_code})")
+                                passed_tests += 1
+                            else:
+                                access_test_results.append(f"❌ {role.upper()} → {endpoint}: Expected access, got HTTP {response.status_code}")
+                        else:
+                            # Should be denied (403 or 401)
+                            if response.status_code in [401, 403]:
+                                access_test_results.append(f"✅ {role.upper()} → {endpoint}: Correctly denied (HTTP {response.status_code})")
+                                passed_tests += 1
+                            else:
+                                access_test_results.append(f"❌ {role.upper()} → {endpoint}: Expected denial, got HTTP {response.status_code}")
+            
+            # Log detailed results
+            self.log_result("Comprehensive Role-Based Access Control", 
+                passed_tests == total_tests,
+                f"Access control tests: {passed_tests}/{total_tests} passed")
+            
+            # Print detailed access control results
+            print("   Detailed Access Control Results:")
+            for result in access_test_results:
+                print(f"     {result}")
+            
+            return passed_tests == total_tests
+        except Exception as e:
+            self.log_result("Comprehensive Role-Based Access Control", False, f"Error: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all backend tests including team assignment and search functionality"""
-        print("🚀 Starting Comprehensive Backend Testing Suite - Team Assignment & Search Focus")
+        print("🚀 Starting Comprehensive Backend Testing Suite - Project Manager Role Focus")
         print(f"Backend URL: {BACKEND_URL}")
-        print("=" * 80)
+        print("=" * 90)
         
         # Test sequence - Authentication first, then new team and search functionality
         tests = [
