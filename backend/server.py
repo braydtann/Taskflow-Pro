@@ -329,6 +329,17 @@ class ProjectCreate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[ProjectStatus] = None
+    status_override: Optional[ProjectStatus] = None
+    collaborators: Optional[List[str]] = None
+    project_managers: Optional[List[str]] = None
+    assigned_teams: Optional[List[str]] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
 # Subtask Management Models
 class SubtaskCreate(BaseModel):
     text: str
