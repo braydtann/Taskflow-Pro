@@ -870,6 +870,30 @@ async def search_tasks(query: str, current_user: UserInDB = Depends(get_current_
         for task in tasks
     ]
 
+@api_router.get("/teams/user")
+async def get_user_teams(current_user: UserInDB = Depends(get_current_active_user)):
+    """Get teams that the current user belongs to"""
+    user_teams = current_user.team_ids if hasattr(current_user, 'team_ids') else []
+    
+    if not user_teams:
+        return []
+    
+    teams = await db.teams.find({
+        "id": {"$in": user_teams},
+        "is_active": True
+    }).sort("name", 1).to_list(1000)
+    
+    # Return simplified team data for dropdown
+    return [
+        {
+            "id": team["id"],
+            "name": team["name"],
+            "description": team.get("description", ""),
+            "member_count": len(team.get("members", []))
+        }
+        for team in teams
+    ]
+
 @api_router.get("/tasks/{task_id}", response_model=Task)
 async def get_task(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
     # Get user's team IDs to find team-assigned tasks
