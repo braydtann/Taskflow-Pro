@@ -280,6 +280,7 @@ class TaskUpdate(BaseModel):
     actual_duration: Optional[int] = None
     due_date: Optional[datetime] = None
     assigned_users: Optional[List[str]] = None
+    assigned_teams: Optional[List[str]] = None
     collaborators: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     start_time: Optional[datetime] = None
