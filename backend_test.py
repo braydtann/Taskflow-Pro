@@ -1303,7 +1303,7 @@ class TaskManagementTester:
         
         # Final results
         print("\n" + "=" * 80)
-        print("🏁 FINAL TEST RESULTS - SUBTASK MANAGEMENT TESTING")
+        print("🏁 FINAL TEST RESULTS - TEAM ASSIGNMENT & SEARCH TESTING")
         print("=" * 80)
         print(f"✅ Passed: {self.results['passed']}")
         print(f"❌ Failed: {self.results['failed']}")
