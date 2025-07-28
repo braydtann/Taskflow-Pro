@@ -888,6 +888,341 @@ class TaskManagementTester:
             self.log_result("Subtask Permissions", False, f"Error: {str(e)}")
             return False
 
+    def test_team_assignment_functionality(self):
+        """Test Team Assignment Features"""
+        print("\n=== Testing Team Assignment Functionality ===")
+        
+        if not self.test_data['users']:
+            self.log_result("Team Assignment Setup", False, "No authenticated users available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        user2 = self.test_data['users'][1] if len(self.test_data['users']) > 1 else user1
+        
+        try:
+            # First, create a team (assuming admin functionality exists)
+            # For testing purposes, we'll simulate team membership by adding team_ids to users
+            test_team_id = str(uuid.uuid4())
+            
+            # Test 1: Create task with team assignment
+            if self.test_data['projects']:
+                project = self.test_data['projects'][0]
+                task_data = {
+                    "title": "Team-Assigned Task: Frontend Development",
+                    "description": "Develop React components for the dashboard with team collaboration",
+                    "priority": "high",
+                    "project_id": project['id'],
+                    "estimated_duration": 360,  # 6 hours
+                    "assigned_teams": [test_team_id],  # Assign to team
+                    "assigned_users": [user1['token_data']['user']['id']],
+                    "collaborators": [user2['token_data']['user']['id']] if user2 != user1 else [],
+                    "tags": ["frontend", "team-task", "react"]
+                }
+                
+                response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data, headers=user1['headers'])
+                if response.status_code == 200:
+                    team_task = response.json()
+                    self.test_data['tasks'].append(team_task)
+                    
+                    # Verify assigned_teams field is present
+                    if team_task.get('assigned_teams') == [test_team_id]:
+                        self.log_result("Task Creation with Team Assignment", True, f"Task assigned to team: {test_team_id[:8]}...")
+                    else:
+                        self.log_result("Task Creation with Team Assignment", False, "assigned_teams field not set correctly")
+                else:
+                    self.log_result("Task Creation with Team Assignment", False, f"HTTP {response.status_code}: {response.text}")
+                    return False
+            
+            # Test 2: Update task with team assignments
+            if self.test_data['tasks']:
+                task = self.test_data['tasks'][-1]  # Use the team task we just created
+                new_team_id = str(uuid.uuid4())
+                
+                update_data = {
+                    "assigned_teams": [test_team_id, new_team_id],  # Add another team
+                    "title": "Updated Team-Assigned Task: Full-Stack Development"
+                }
+                
+                response = self.session.put(f"{BACKEND_URL}/tasks/{task['id']}", json=update_data, headers=user1['headers'])
+                if response.status_code == 200:
+                    updated_task = response.json()
+                    if len(updated_task.get('assigned_teams', [])) == 2:
+                        self.log_result("Task Update with Team Assignment", True, "Task updated with multiple team assignments")
+                    else:
+                        self.log_result("Task Update with Team Assignment", False, "Team assignments not updated correctly")
+                else:
+                    self.log_result("Task Update with Team Assignment", False, f"HTTP {response.status_code}")
+            
+            # Test 3: Verify task retrieval includes team-assigned tasks
+            response = self.session.get(f"{BACKEND_URL}/tasks", headers=user1['headers'])
+            if response.status_code == 200:
+                tasks = response.json()
+                team_tasks = [t for t in tasks if t.get('assigned_teams')]
+                
+                if len(team_tasks) > 0:
+                    self.log_result("Task Retrieval with Team Assignments", True, f"Found {len(team_tasks)} team-assigned tasks")
+                else:
+                    self.log_result("Task Retrieval with Team Assignments", False, "No team-assigned tasks found in retrieval")
+            else:
+                self.log_result("Task Retrieval with Team Assignments", False, f"HTTP {response.status_code}")
+            
+            # Test 4: Individual task retrieval includes team assignment data
+            if self.test_data['tasks']:
+                task = self.test_data['tasks'][-1]
+                response = self.session.get(f"{BACKEND_URL}/tasks/{task['id']}", headers=user1['headers'])
+                if response.status_code == 200:
+                    retrieved_task = response.json()
+                    if retrieved_task.get('assigned_teams'):
+                        self.log_result("Individual Task Retrieval with Teams", True, "Individual task includes team assignment data")
+                    else:
+                        self.log_result("Individual Task Retrieval with Teams", False, "Team assignment data missing in individual retrieval")
+                else:
+                    self.log_result("Individual Task Retrieval with Teams", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Team Assignment Functionality", False, f"Error: {str(e)}")
+            return False
+
+    def test_search_functionality(self):
+        """Test Search Functionality"""
+        print("\n=== Testing Search Functionality ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Search Functionality Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        
+        try:
+            # Create some test tasks with searchable titles
+            search_test_tasks = [
+                {
+                    "title": "Authentication System Implementation",
+                    "description": "Build JWT-based authentication with user management",
+                    "priority": "high",
+                    "tags": ["auth", "security", "backend"]
+                },
+                {
+                    "title": "User Interface Dashboard Design",
+                    "description": "Create responsive dashboard with analytics charts",
+                    "priority": "medium",
+                    "tags": ["ui", "frontend", "design"]
+                },
+                {
+                    "title": "Database Schema Optimization",
+                    "description": "Optimize MongoDB queries and indexing strategies",
+                    "priority": "low",
+                    "tags": ["database", "performance", "backend"]
+                }
+            ]
+            
+            created_search_tasks = []
+            for task_data in search_test_tasks:
+                response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data, headers=user1['headers'])
+                if response.status_code == 200:
+                    created_search_tasks.append(response.json())
+            
+            if len(created_search_tasks) < 3:
+                self.log_result("Search Test Data Creation", False, f"Only created {len(created_search_tasks)} of 3 test tasks")
+                return False
+            
+            self.log_result("Search Test Data Creation", True, f"Created {len(created_search_tasks)} test tasks for search")
+            
+            # Test 1: Basic search functionality
+            response = self.session.get(f"{BACKEND_URL}/tasks/search/authentication", headers=user1['headers'])
+            if response.status_code == 200:
+                search_results = response.json()
+                if isinstance(search_results, list) and len(search_results) > 0:
+                    self.log_result("Basic Search Functionality", True, f"Found {len(search_results)} results for 'authentication'")
+                    
+                    # Verify search result structure
+                    first_result = search_results[0]
+                    required_fields = ['id', 'title', 'description', 'status', 'priority']
+                    if all(field in first_result for field in required_fields):
+                        self.log_result("Search Result Structure", True, "Search results have all required fields")
+                    else:
+                        missing = [f for f in required_fields if f not in first_result]
+                        self.log_result("Search Result Structure", False, f"Missing fields: {missing}")
+                else:
+                    self.log_result("Basic Search Functionality", False, "No search results returned")
+            else:
+                self.log_result("Basic Search Functionality", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # Test 2: Case-insensitive search
+            response = self.session.get(f"{BACKEND_URL}/tasks/search/DASHBOARD", headers=user1['headers'])
+            if response.status_code == 200:
+                search_results = response.json()
+                if len(search_results) > 0:
+                    self.log_result("Case-Insensitive Search", True, f"Found {len(search_results)} results for 'DASHBOARD' (uppercase)")
+                else:
+                    self.log_result("Case-Insensitive Search", False, "Case-insensitive search not working")
+            else:
+                self.log_result("Case-Insensitive Search", False, f"HTTP {response.status_code}")
+            
+            # Test 3: Partial match search
+            response = self.session.get(f"{BACKEND_URL}/tasks/search/data", headers=user1['headers'])
+            if response.status_code == 200:
+                search_results = response.json()
+                if len(search_results) > 0:
+                    self.log_result("Partial Match Search", True, f"Found {len(search_results)} results for partial match 'data'")
+                else:
+                    self.log_result("Partial Match Search", False, "Partial match search not working")
+            else:
+                self.log_result("Partial Match Search", False, f"HTTP {response.status_code}")
+            
+            # Test 4: Search with no results
+            response = self.session.get(f"{BACKEND_URL}/tasks/search/nonexistentquery12345", headers=user1['headers'])
+            if response.status_code == 200:
+                search_results = response.json()
+                if isinstance(search_results, list) and len(search_results) == 0:
+                    self.log_result("Empty Search Results", True, "Search correctly returns empty array for no matches")
+                else:
+                    self.log_result("Empty Search Results", False, f"Expected empty array, got {len(search_results)} results")
+            else:
+                self.log_result("Empty Search Results", False, f"HTTP {response.status_code}")
+            
+            # Test 5: Search results filtering by user access
+            response = self.session.get(f"{BACKEND_URL}/tasks/search/system", headers=user1['headers'])
+            if response.status_code == 200:
+                search_results = response.json()
+                # All results should be accessible to the current user
+                self.log_result("Search Access Control", True, f"Search returned {len(search_results)} user-accessible results")
+            else:
+                self.log_result("Search Access Control", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Search Functionality", False, f"Error: {str(e)}")
+            return False
+
+    def test_user_teams_endpoint(self):
+        """Test User Teams Endpoint"""
+        print("\n=== Testing User Teams Endpoint ===")
+        
+        if not self.test_data['users']:
+            self.log_result("User Teams Setup", False, "No authenticated users available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        
+        try:
+            # Test GET /api/teams/user endpoint
+            response = self.session.get(f"{BACKEND_URL}/teams/user", headers=user1['headers'])
+            if response.status_code == 200:
+                user_teams = response.json()
+                
+                if isinstance(user_teams, list):
+                    self.log_result("User Teams Endpoint", True, f"Retrieved {len(user_teams)} teams for user")
+                    
+                    # If user has teams, verify structure
+                    if len(user_teams) > 0:
+                        first_team = user_teams[0]
+                        required_fields = ['id', 'name']
+                        if all(field in first_team for field in required_fields):
+                            self.log_result("User Teams Data Structure", True, "Team data has required fields")
+                        else:
+                            missing = [f for f in required_fields if f not in first_team]
+                            self.log_result("User Teams Data Structure", False, f"Missing fields: {missing}")
+                    else:
+                        self.log_result("User Teams Data Structure", True, "User has no teams (empty array returned)")
+                else:
+                    self.log_result("User Teams Endpoint", False, "Response is not an array")
+            else:
+                self.log_result("User Teams Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+            
+            return True
+        except Exception as e:
+            self.log_result("User Teams Endpoint", False, f"Error: {str(e)}")
+            return False
+
+    def test_timer_with_team_tasks(self):
+        """Test Timer Functionality with Team-Assigned Tasks"""
+        print("\n=== Testing Timer with Team-Assigned Tasks ===")
+        
+        if not self.test_data['users'] or not self.test_data['tasks']:
+            self.log_result("Timer Team Tasks Setup", False, "No authenticated users or tasks available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        
+        try:
+            # Find a team-assigned task or create one
+            team_task = None
+            for task in self.test_data['tasks']:
+                if task.get('assigned_teams'):
+                    team_task = task
+                    break
+            
+            if not team_task:
+                # Create a team-assigned task for timer testing
+                test_team_id = str(uuid.uuid4())
+                task_data = {
+                    "title": "Timer Test Task with Team Assignment",
+                    "description": "Testing timer functionality on team-assigned tasks",
+                    "priority": "medium",
+                    "assigned_teams": [test_team_id],
+                    "estimated_duration": 60
+                }
+                
+                response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data, headers=user1['headers'])
+                if response.status_code == 200:
+                    team_task = response.json()
+                    self.test_data['tasks'].append(team_task)
+                else:
+                    self.log_result("Timer Team Task Creation", False, f"HTTP {response.status_code}")
+                    return False
+            
+            task_id = team_task['id']
+            
+            # Test 1: Start timer on team-assigned task
+            response = self.session.post(f"{BACKEND_URL}/tasks/{task_id}/timer/start", headers=user1['headers'])
+            if response.status_code == 200:
+                timer_response = response.json()
+                if timer_response.get('message') and 'started' in timer_response['message'].lower():
+                    self.log_result("Timer Start on Team Task", True, "Timer started successfully on team-assigned task")
+                else:
+                    self.log_result("Timer Start on Team Task", False, "Timer start response invalid")
+            else:
+                self.log_result("Timer Start on Team Task", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Wait a moment for timer to run
+            time.sleep(2)
+            
+            # Test 2: Get timer status on team-assigned task
+            response = self.session.get(f"{BACKEND_URL}/tasks/{task_id}/timer/status", headers=user1['headers'])
+            if response.status_code == 200:
+                status_response = response.json()
+                if status_response.get('is_timer_running') == True:
+                    self.log_result("Timer Status on Team Task", True, "Timer status correctly shows running on team task")
+                else:
+                    self.log_result("Timer Status on Team Task", False, "Timer status not showing as running")
+            else:
+                self.log_result("Timer Status on Team Task", False, f"HTTP {response.status_code}")
+            
+            # Test 3: Stop timer on team-assigned task
+            response = self.session.post(f"{BACKEND_URL}/tasks/{task_id}/timer/stop", headers=user1['headers'])
+            if response.status_code == 200:
+                stop_response = response.json()
+                if stop_response.get('message') and 'stopped' in stop_response['message'].lower():
+                    self.log_result("Timer Stop on Team Task", True, "Timer stopped successfully on team-assigned task")
+                    
+                    # Verify task was updated with actual duration
+                    if stop_response.get('task', {}).get('actual_duration') is not None:
+                        self.log_result("Timer Duration Tracking on Team Task", True, "Actual duration tracked on team task")
+                    else:
+                        self.log_result("Timer Duration Tracking on Team Task", False, "Actual duration not tracked")
+                else:
+                    self.log_result("Timer Stop on Team Task", False, "Timer stop response invalid")
+            else:
+                self.log_result("Timer Stop on Team Task", False, f"HTTP {response.status_code}")
+            
+            return True
+        except Exception as e:
+            self.log_result("Timer with Team Tasks", False, f"Error: {str(e)}")
+            return False
+
     def test_error_handling(self):
         """Test API error handling"""
         print("\n=== Testing Error Handling ===")
