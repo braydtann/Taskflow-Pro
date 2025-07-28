@@ -485,6 +485,120 @@ async def get_current_admin_user(current_user: UserInDB = Depends(get_current_ac
         )
     return current_user
 
+async def get_current_project_manager(current_user: UserInDB = Depends(get_current_active_user)):
+    if current_user.role not in [UserRole.PROJECT_MANAGER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Project manager access required"
+        )
+    return current_user
+
+async def check_project_manager_access(project_id: str, current_user: UserInDB):
+    """Check if current user can manage the given project"""
+    # Admin can manage all projects
+    if current_user.role == UserRole.ADMIN:
+        return True
+    
+    # Project managers can manage projects they're assigned to
+    if current_user.role == UserRole.PROJECT_MANAGER:
+        project = await db.projects.find_one({"id": project_id})
+        if project and (
+            current_user.id in project.get("project_managers", []) or
+            current_user.id == project.get("owner_id")
+        ):
+            return True
+    
+    return False
+
+async def log_activity(user_id: str, action: str, entity_type: str, entity_id: str, entity_name: str, project_id: str = None, details: Dict[str, Any] = None):
+    """Log user activity for audit trail"""
+    activity = ActivityLog(
+        user_id=user_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_name=entity_name,
+        project_id=project_id,
+        details=details or {}
+    )
+    await db.activity_logs.insert_one(activity.dict())
+
+async def create_notification(user_id: str, title: str, message: str, notification_type: str, priority: str = "medium", entity_type: str = None, entity_id: str = None, project_id: str = None, action_url: str = None):
+    """Create a notification for a user"""
+    notification = Notification(
+        user_id=user_id,
+        title=title,
+        message=message,
+        type=notification_type,
+        priority=priority,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        project_id=project_id,
+        action_url=action_url
+    )
+    await db.notifications.insert_one(notification.dict())
+
+async def calculate_project_status(project_id: str):
+    """Calculate auto project status based on tasks"""
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        return ProjectStatus.ACTIVE
+    
+    # Get all tasks for this project
+    tasks = await db.tasks.find({"project_id": project_id}).to_list(1000)
+    
+    if not tasks:
+        return ProjectStatus.ACTIVE
+    
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.get("status") == "completed"])
+    in_progress_tasks = len([t for t in tasks if t.get("status") == "in_progress"])
+    blocked_tasks = len([t for t in tasks if t.get("status") == "blocked"])
+    overdue_tasks = len([t for t in tasks if t.get("due_date") and datetime.fromisoformat(t["due_date"].replace('Z', '+00:00')) < datetime.utcnow() and t.get("status") != "completed"])
+    
+    # Calculate progress percentage
+    progress = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
+    
+    # Determine status
+    if progress == 100:
+        return ProjectStatus.COMPLETED
+    elif blocked_tasks > 0 or overdue_tasks > 0:
+        return ProjectStatus.ON_HOLD  # At Risk
+    elif in_progress_tasks > 0:
+        return ProjectStatus.ACTIVE  # In Progress
+    else:
+        return ProjectStatus.ACTIVE  # Not Started
+
+async def update_project_progress(project_id: str):
+    """Update project progress and auto-calculated status"""
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        return
+    
+    # Calculate new status and progress
+    auto_status = await calculate_project_status(project_id)
+    
+    # Get tasks for progress calculation
+    tasks = await db.tasks.find({"project_id": project_id}).to_list(1000)
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.get("status") == "completed"])
+    progress = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
+    
+    # Update project
+    update_data = {
+        "auto_calculated_status": auto_status,
+        "progress_percentage": progress,
+        "task_count": total_tasks,
+        "completed_task_count": completed_tasks,
+        "updated_at": datetime.utcnow()
+    }
+    
+    # Use override status if set, otherwise use auto-calculated
+    if not project.get("status_override"):
+        update_data["status"] = auto_status
+    
+    await db.projects.update_one({"id": project_id}, {"$set": update_data})
+
 # Helper functions (updated for user filtering)
 async def calculate_productivity_metrics(user_id: str, date: datetime = None):
     """Calculate productivity metrics for a user"""
