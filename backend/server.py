@@ -554,7 +554,25 @@ async def calculate_project_status(project_id: str):
     completed_tasks = len([t for t in tasks if t.get("status") == "completed"])
     in_progress_tasks = len([t for t in tasks if t.get("status") == "in_progress"])
     blocked_tasks = len([t for t in tasks if t.get("status") == "blocked"])
-    overdue_tasks = len([t for t in tasks if t.get("due_date") and datetime.fromisoformat(t["due_date"].replace('Z', '+00:00')) < datetime.utcnow() and t.get("status") != "completed"])
+    
+    # Handle datetime parsing for overdue tasks
+    overdue_tasks = 0
+    for task in tasks:
+        if task.get("due_date") and task.get("status") != "completed":
+            try:
+                due_date = task["due_date"]
+                if isinstance(due_date, str):
+                    # Parse string datetime
+                    due_date_obj = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+                else:
+                    # Already a datetime object
+                    due_date_obj = due_date
+                
+                if due_date_obj < datetime.utcnow():
+                    overdue_tasks += 1
+            except (ValueError, TypeError) as e:
+                # Skip tasks with invalid datetime formats
+                continue
     
     # Calculate progress percentage
     progress = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
