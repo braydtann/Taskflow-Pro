@@ -1268,26 +1268,29 @@ class TaskManagementTester:
         """Test project manager role functionality and permissions"""
         print("\n🔐 Testing Project Manager Authentication & Permissions...")
         
+        # Generate unique identifiers for this test run
+        test_id = str(uuid.uuid4())[:8]
+        
         # Create test users with different roles
         pm_user_data = {
-            "email": "pm.manager@taskflow.com",
-            "username": "pmmanager",
+            "email": f"pm.manager.{test_id}@taskflow.com",
+            "username": f"pmmanager{test_id}",
             "full_name": "Project Manager",
             "password": "SecurePass123!",
             "role": "project_manager"
         }
         
         admin_user_data = {
-            "email": "admin.user@taskflow.com", 
-            "username": "adminuser",
+            "email": f"admin.user.{test_id}@taskflow.com", 
+            "username": f"adminuser{test_id}",
             "full_name": "Admin User",
             "password": "AdminPass123!",
             "role": "admin"
         }
         
         regular_user_data = {
-            "email": "regular.user@taskflow.com",
-            "username": "regularuser", 
+            "email": f"regular.user.{test_id}@taskflow.com",
+            "username": f"regularuser{test_id}", 
             "full_name": "Regular User",
             "password": "UserPass123!",
             "role": "user"
@@ -1311,20 +1314,20 @@ class TaskManagementTester:
                 self.pm_user_id = pm_response.json()["user"]["id"]
                 self.log_result("Project Manager Registration", True, "PM user registered successfully")
             else:
-                self.log_result("Project Manager Registration", False, f"Status: {pm_response.status_code}")
+                self.log_result("Project Manager Registration", False, f"Status: {pm_response.status_code}, Response: {pm_response.text}")
                 
             if admin_response.status_code == 200:
                 self.admin_token = admin_response.json()["access_token"]
                 self.admin_user_id = admin_response.json()["user"]["id"]
                 self.log_result("Admin User Registration", True, "Admin user registered successfully")
             else:
-                self.log_result("Admin User Registration", False, f"Status: {admin_response.status_code}")
+                self.log_result("Admin User Registration", False, f"Status: {admin_response.status_code}, Response: {admin_response.text}")
                 
             if regular_response.status_code == 200:
                 self.regular_token = regular_response.json()["access_token"]
                 self.log_result("Regular User Registration", True, "Regular user registered successfully")
             else:
-                self.log_result("Regular User Registration", False, f"Status: {regular_response.status_code}")
+                self.log_result("Regular User Registration", False, f"Status: {regular_response.status_code}, Response: {regular_response.text}")
                 
         except Exception as e:
             self.log_result("User Registration", False, f"Error: {str(e)}")
