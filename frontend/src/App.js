@@ -74,6 +74,11 @@ const Navigation = () => {
     navItems.push({ path: "/admin", label: "Admin", icon: "⚙️" });
   }
 
+  // Add Project Manager Dashboard for project managers and admins
+  if (user?.role === 'project_manager' || user?.role === 'admin') {
+    navItems.push({ path: "/pm-dashboard", label: "PM Dashboard", icon: "🧩" });
+  }
+
   return (
     <nav className="nav-container">
       <div className="nav-brand">
