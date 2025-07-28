@@ -1265,17 +1265,21 @@ class TaskManagementTester:
         print(f"Cleanup completed")
 
     def run_all_tests(self):
-        """Run all backend tests including comprehensive subtask functionality"""
-        print("🚀 Starting Comprehensive Backend Testing Suite - Subtask Management Focus")
+        """Run all backend tests including team assignment and search functionality"""
+        print("🚀 Starting Comprehensive Backend Testing Suite - Team Assignment & Search Focus")
         print(f"Backend URL: {BACKEND_URL}")
         print("=" * 80)
         
-        # Test sequence - Authentication first, then subtask functionality
+        # Test sequence - Authentication first, then new team and search functionality
         tests = [
             self.test_api_connectivity,
             self.test_user_authentication,
             self.test_project_crud,
             self.test_task_crud_with_analytics,
+            self.test_team_assignment_functionality,
+            self.test_search_functionality,
+            self.test_user_teams_endpoint,
+            self.test_timer_with_team_tasks,
             self.test_subtask_crud_operations,
             self.test_subtask_comments_system,
             self.test_subtask_integration_with_tasks,
