@@ -1298,12 +1298,21 @@ class TaskManagementTester:
             except Exception as e:
                 self.log_result(test.__name__, False, f"Test execution error: {str(e)}")
         
+        # Test Project Manager Dashboard functionality
+        print("\n" + "=" * 80)
+        print("🎯 TESTING PROJECT MANAGER DASHBOARD FUNCTIONALITY")
+        print("=" * 80)
+        self.test_project_manager_authentication()
+        self.test_project_manager_dashboard_endpoints()
+        self.test_activity_logging_and_notifications()
+        self.test_project_status_and_progress()
+        
         # Cleanup
         self.cleanup_test_data()
         
         # Final results
         print("\n" + "=" * 80)
-        print("🏁 FINAL TEST RESULTS - TEAM ASSIGNMENT & SEARCH TESTING")
+        print("🏁 FINAL TEST RESULTS - PROJECT MANAGER DASHBOARD TESTING")
         print("=" * 80)
         print(f"✅ Passed: {self.results['passed']}")
         print(f"❌ Failed: {self.results['failed']}")
