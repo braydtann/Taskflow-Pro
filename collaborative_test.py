@@ -17,7 +17,7 @@ from typing import Dict, List, Any, Optional
 import jwt as jwt_lib
 
 # Configuration
-BACKEND_URL = "https://c8100f3d-9630-4d28-8ec8-815398f88ad4.preview.emergentagent.com/api"
+BACKEND_URL = "https://34c353d5-13c6-4f3d-b463-fb80eaba5a2e.preview.emergentagent.com/api"
 WEBSOCKET_URL = "wss://5f9f27c3-39df-42c0-9993-777740083949.preview.emergentagent.com/ws"
 TIMEOUT = 30
 
