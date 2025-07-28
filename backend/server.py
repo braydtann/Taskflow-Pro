@@ -823,13 +823,23 @@ async def get_task(task_id: str, current_user: UserInDB = Depends(get_current_ac
 
 @api_router.put("/tasks/{task_id}", response_model=Task)
 async def update_task(task_id: str, task_update: TaskUpdate, current_user: UserInDB = Depends(get_current_active_user)):
+    # Get user's team IDs to find team-assigned tasks
+    user_teams = current_user.team_ids if hasattr(current_user, 'team_ids') else []
+    
+    # Build filter conditions
+    filter_conditions = [
+        {"owner_id": current_user.id},
+        {"assigned_users": current_user.id},
+        {"collaborators": current_user.id}
+    ]
+    
+    # Add team-assigned tasks if user has teams
+    if user_teams:
+        filter_conditions.append({"assigned_teams": {"$in": user_teams}})
+    
     task = await db.tasks.find_one({
         "id": task_id,
-        "$or": [
-            {"owner_id": current_user.id},
-            {"assigned_users": current_user.id},
-            {"collaborators": current_user.id}
-        ]
+        "$or": filter_conditions
     })
     if not task:
         raise HTTPException(status_code=404, detail="Task not found or access denied")
