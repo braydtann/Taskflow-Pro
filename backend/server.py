@@ -2536,7 +2536,25 @@ async def get_project_team(project_id: str, current_user: UserInDB = Depends(get
         
         active_tasks = [t for t in member_tasks if t.get("status") in ["todo", "in_progress"]]
         completed_tasks = [t for t in member_tasks if t.get("status") == "completed"]
-        overdue_tasks = [t for t in member_tasks if t.get("due_date") and datetime.fromisoformat(t["due_date"].replace('Z', '+00:00')) < datetime.utcnow() and t.get("status") != "completed"]
+        
+        # Handle datetime parsing for overdue tasks
+        overdue_tasks = []
+        for task in member_tasks:
+            if task.get("due_date") and task.get("status") != "completed":
+                try:
+                    due_date = task["due_date"]
+                    if isinstance(due_date, str):
+                        # Parse string datetime
+                        due_date_obj = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+                    else:
+                        # Already a datetime object
+                        due_date_obj = due_date
+                    
+                    if due_date_obj < datetime.utcnow():
+                        overdue_tasks.append(task)
+                except (ValueError, TypeError) as e:
+                    # Skip tasks with invalid datetime formats
+                    continue
         
         member_workload[member_id] = {
             "user": {
