@@ -263,6 +263,34 @@ class PerformanceMetrics(BaseModel):
     productivity_score: float = 0.0
     accuracy_score: float = 0.0  # estimated vs actual time accuracy
 
+# Activity Log Model
+class ActivityLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str  # User who performed the action
+    action: str  # Action performed (created, updated, deleted, etc.)
+    entity_type: str  # Type of entity (task, project, user, etc.)
+    entity_id: str  # ID of the entity affected
+    entity_name: str  # Name/title of the entity for display
+    project_id: Optional[str] = None  # Project context if applicable
+    details: Dict[str, Any] = {}  # Additional details about the action
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+# Notification Model
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str  # User who should receive the notification
+    title: str  # Notification title
+    message: str  # Notification message
+    type: str  # Type of notification (overdue, deadline, blocked, etc.)
+    priority: str  # Priority level (low, medium, high)
+    read: bool = False  # Whether the notification has been read
+    entity_type: Optional[str] = None  # Related entity type
+    entity_id: Optional[str] = None  # Related entity ID
+    project_id: Optional[str] = None  # Project context if applicable
+    action_url: Optional[str] = None  # URL to navigate to when clicked
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    read_at: Optional[datetime] = None
+
 # Create/Update Models
 class TaskCreate(BaseModel):
     title: str
