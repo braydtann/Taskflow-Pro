@@ -182,6 +182,17 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Assigned Users (comma-separated emails)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.assigned_users}
+              onChange={(e) => setFormData({ ...formData, assigned_users: e.target.value })}
+              placeholder="user1@email.com, user2@email.com"
+            />
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Collaborators (comma-separated emails)</label>
             <input
               type="text"
@@ -191,6 +202,31 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
               placeholder="collaborator1@email.com, collaborator2@email.com"
             />
           </div>
+
+          {/* Team Assignment Section */}
+          {userTeams.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Assign to Teams</label>
+              <div className="team-selection-container">
+                {userTeams.map(team => (
+                  <div key={team.id} className="team-checkbox-item">
+                    <label className="team-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formData.assigned_teams.includes(team.id)}
+                        onChange={() => handleTeamToggle(team.id)}
+                        className="team-checkbox"
+                      />
+                      <span className="team-checkbox-text">
+                        <span className="team-name">{team.name}</span>
+                        <span className="team-member-count">({team.member_count} members)</span>
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Tags (comma-separated)</label>
