@@ -220,6 +220,7 @@ class Task(BaseModel):
     due_date: Optional[datetime] = None
     owner_id: str  # User who owns this task
     assigned_users: List[str] = []  # User IDs assigned to this task
+    assigned_teams: List[str] = []  # Team IDs assigned to this task
     collaborators: List[str] = []  # User IDs collaborating on this task
     tags: List[str] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
