@@ -802,7 +802,7 @@ const TeamForm = ({ team, users, onSubmit, onCancel }) => {
                     <div className="member-selector-info">
                       <div className="member-selector-name">{user.full_name}</div>
                       <div className="member-selector-email">{user.email}</div>
-                      <div className="member-selector-role">{user.role}</div>
+                      <div className="member-selector-role">{user.role === 'project_manager' ? 'Project Manager' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}</div>
                     </div>
                   </label>
                 </div>
