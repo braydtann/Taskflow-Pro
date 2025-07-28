@@ -20,10 +20,26 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
     due_date: task?.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : "",
     owners: task?.owners?.join(", ") || "",
     collaborators: task?.collaborators?.join(", ") || "",
+    assigned_users: task?.assigned_users?.join(", ") || "",
+    assigned_teams: task?.assigned_teams || [],
     tags: task?.tags?.join(", ") || ""
   });
 
   const [showSmartScheduling, setShowSmartScheduling] = useState(false);
+  const [userTeams, setUserTeams] = useState([]);
+
+  // Fetch user teams for dropdown
+  useEffect(() => {
+    const fetchUserTeams = async () => {
+      try {
+        const response = await axios.get(`${API}/teams/user`);
+        setUserTeams(response.data);
+      } catch (error) {
+        console.error("Error fetching user teams:", error);
+      }
+    };
+    fetchUserTeams();
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,6 +49,8 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
       owners: formData.owners.split(",").map(s => s.trim()).filter(s => s),
       collaborators: formData.collaborators.split(",").map(s => s.trim()).filter(s => s),
+      assigned_users: formData.assigned_users.split(",").map(s => s.trim()).filter(s => s),
+      assigned_teams: formData.assigned_teams,
       tags: formData.tags.split(",").map(s => s.trim()).filter(s => s)
     };
     onSubmit(submitData);
@@ -47,9 +65,20 @@ const TaskForm = ({ task, onSubmit, onCancel, projects }) => {
       due_date: scheduledTask.end_time,
       owners: formData.owners.split(",").map(s => s.trim()).filter(s => s),
       collaborators: formData.collaborators.split(",").map(s => s.trim()).filter(s => s),
+      assigned_users: formData.assigned_users.split(",").map(s => s.trim()).filter(s => s),
+      assigned_teams: formData.assigned_teams,
       tags: formData.tags.split(",").map(s => s.trim()).filter(s => s)
     };
     onSubmit(submitData);
+  };
+
+  const handleTeamToggle = (teamId) => {
+    setFormData(prev => ({
+      ...prev,
+      assigned_teams: prev.assigned_teams.includes(teamId)
+        ? prev.assigned_teams.filter(id => id !== teamId)
+        : [...prev.assigned_teams, teamId]
+    }));
   };
 
   return (
