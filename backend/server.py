@@ -797,6 +797,79 @@ async def get_tasks(
     tasks = await db.tasks.find(filter_dict).sort("created_at", -1).to_list(1000)
     return [Task(**task) for task in tasks]
 
+@api_router.get("/tasks/search/{query}")
+async def search_tasks(query: str, current_user: UserInDB = Depends(get_current_active_user)):
+    """Search tasks by title for dashboard quick search"""
+    # Get user's team IDs to find team-assigned tasks
+    user_teams = current_user.team_ids if hasattr(current_user, 'team_ids') else []
+    
+    # Build base access filter
+    filter_conditions = [
+        {"owner_id": current_user.id},
+        {"assigned_users": current_user.id},
+        {"collaborators": current_user.id}
+    ]
+    
+    # Add team-assigned tasks if user has teams
+    if user_teams:
+        filter_conditions.append({"assigned_teams": {"$in": user_teams}})
+    
+    # Add project-based access
+    project_access_conditions = []
+    
+    # Projects user owns or collaborates on
+    user_projects = await db.projects.find({
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborators": current_user.id}
+        ]
+    }).to_list(1000)
+    
+    user_project_ids = [p["id"] for p in user_projects]
+    
+    if user_project_ids:
+        project_access_conditions.append({"project_id": {"$in": user_project_ids}})
+    
+    # Add team-based project access if user has teams
+    if user_teams:
+        team_projects = await db.projects.find({
+            "team_ids": {"$in": user_teams}
+        }).to_list(1000)
+        
+        team_project_ids = [p["id"] for p in team_projects]
+        if team_project_ids:
+            project_access_conditions.append({"project_id": {"$in": team_project_ids}})
+    
+    # Add project access conditions to main filter
+    if project_access_conditions:
+        filter_conditions.extend(project_access_conditions)
+    
+    # Build the search filter
+    search_filter = {
+        "$and": [
+            {"$or": filter_conditions},
+            {"title": {"$regex": query, "$options": "i"}}  # Case-insensitive search
+        ]
+    }
+    
+    # Limit results for quick search
+    tasks = await db.tasks.find(search_filter).sort("created_at", -1).limit(10).to_list(10)
+    
+    # Return simplified task data for search results
+    return [
+        {
+            "id": task["id"],
+            "title": task["title"],
+            "description": task.get("description", ""),
+            "status": task["status"],
+            "priority": task["priority"],
+            "project_name": task.get("project_name", ""),
+            "due_date": task.get("due_date"),
+            "created_at": task["created_at"]
+        }
+        for task in tasks
+    ]
+
 @api_router.get("/tasks/{task_id}", response_model=Task)
 async def get_task(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
     # Get user's team IDs to find team-assigned tasks
