@@ -1510,14 +1510,8 @@ async def pause_task_timer(task_id: str, current_user: UserInDB = Depends(get_cu
 @api_router.post("/tasks/{task_id}/timer/resume")
 async def resume_task_timer(task_id: str, current_user: UserInDB = Depends(get_current_active_user)):
     """Resume paused timer for a task"""
-    task = await db.tasks.find_one({
-        "id": task_id,
-        "$or": [
-            {"owner_id": current_user.id},
-            {"assigned_users": current_user.id},
-            {"collaborators": current_user.id}
-        ]
-    })
+    task_filter = await build_task_access_filter(task_id, current_user)
+    task = await db.tasks.find_one(task_filter)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found or access denied")
     
