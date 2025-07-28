@@ -7,6 +7,9 @@ import { AuthProvider, useAuth, ProtectedRoute, UserProfile } from "./auth";
 import { AdminDashboard, UserManagement, TeamManagement } from "./admin-components";
 import { WebSocketProvider, useWebSocketContext } from "./websocket";
 import DuckAnimation from "./duck-animation";
+import { ProjectManagerDashboard } from "./pm-dashboard";
+import { PMNotifications, PMNotificationBell } from "./pm-notifications";
+import PMProjectTasks from "./pm-project-tasks";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
