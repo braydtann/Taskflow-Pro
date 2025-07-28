@@ -721,6 +721,8 @@ const AppContent = () => {
           <Route path="/calendar" element={<TaskManager initialTab="calendar" />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/pm-dashboard" element={<ProjectManagerDashboard />} />
+          <Route path="/pm-notifications" element={<PMNotifications />} />
         </Routes>
       </main>
     </div>
