@@ -475,6 +475,7 @@ const UserForm = ({ user, onSubmit, onCancel, title }) => {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               >
                 <option value="user">User</option>
+                <option value="project_manager">Project Manager</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
