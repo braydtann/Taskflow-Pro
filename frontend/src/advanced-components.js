@@ -410,45 +410,48 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpd
         />
       </div>
 
-      <div className="kanban-card-meta">
-        <span className={`priority-badge ${priorityColors[task.priority]}`}>
-          {task.priority}
-        </span>
-        {task.estimated_duration && (
-          <span className="duration-badge">
-            Est: {Math.round(task.estimated_duration / 60)}h
+      {/* Metadata section - with drag listeners */}
+      <div {...listeners} className="kanban-card-metadata">
+        <div className="kanban-card-meta">
+          <span className={`priority-badge ${priorityColors[task.priority]}`}>
+            {task.priority}
           </span>
+          {task.estimated_duration && (
+            <span className="duration-badge">
+              Est: {Math.round(task.estimated_duration / 60)}h
+            </span>
+          )}
+          {(task.timer_elapsed_seconds > 0 || task.is_timer_running) && (
+            <span className="actual-duration-badge">
+              Actual: {Math.round((task.timer_elapsed_seconds || 0) / 60)} min
+            </span>
+          )}
+        </div>
+
+        {task.assigned_users && task.assigned_users.length > 0 && (
+          <div className="kanban-card-owners">
+            <div className="owner-avatars">
+              {task.assigned_users.slice(0, 3).map((owner, index) => (
+                <div key={index} className="owner-avatar">
+                  {owner.charAt(0).toUpperCase()}
+                </div>
+              ))}
+              {task.assigned_users.length > 3 && (
+                <div className="owner-avatar more">+{task.assigned_users.length - 3}</div>
+              )}
+            </div>
+          </div>
         )}
-        {(task.timer_elapsed_seconds > 0 || task.is_timer_running) && (
-          <span className="actual-duration-badge">
-            Actual: {Math.round((task.timer_elapsed_seconds || 0) / 60)} min
-          </span>
+
+        {task.due_date && (
+          <div className="kanban-card-due">
+            <svg fill="currentColor" viewBox="0 0 24 24" className="due-icon">
+              <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+            </svg>
+            <span>{new Date(task.due_date).toLocaleDateString()}</span>
+          </div>
         )}
       </div>
-
-      {task.assigned_users && task.assigned_users.length > 0 && (
-        <div className="kanban-card-owners">
-          <div className="owner-avatars">
-            {task.assigned_users.slice(0, 3).map((owner, index) => (
-              <div key={index} className="owner-avatar">
-                {owner.charAt(0).toUpperCase()}
-              </div>
-            ))}
-            {task.assigned_users.length > 3 && (
-              <div className="owner-avatar more">+{task.assigned_users.length - 3}</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {task.due_date && (
-        <div className="kanban-card-due">
-          <svg fill="currentColor" viewBox="0 0 24 24" className="due-icon">
-            <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-          </svg>
-          <span>{new Date(task.due_date).toLocaleDateString()}</span>
-        </div>
-      )}
     </div>
   );
 };
