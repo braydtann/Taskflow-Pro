@@ -324,6 +324,8 @@ class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
     collaborators: List[str] = []
+    project_managers: List[str] = []
+    assigned_teams: List[str] = []
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
