@@ -328,7 +328,7 @@ export const UserManagement = () => {
                 <td>{user.email}</td>
                 <td>
                   <span className={`role-badge role-${user.role}`}>
-                    {user.role}
+                    {user.role === 'project_manager' ? 'Project Manager' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                   </span>
                 </td>
                 <td>
