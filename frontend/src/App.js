@@ -108,6 +108,9 @@ const Navigation = () => {
 
       <div className="nav-user">
         <RealTimeStatus />
+        {(user?.role === 'project_manager' || user?.role === 'admin') && (
+          <PMNotificationBell />
+        )}
         <div className="user-profile-container">
           <button 
             className="user-profile-btn"
