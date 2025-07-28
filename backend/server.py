@@ -2208,6 +2208,337 @@ async def search_users(query: str, current_user: UserInDB = Depends(get_current_
     
     return [{"id": user["id"], "username": user["username"], "full_name": user["full_name"], "email": user["email"]} for user in users]
 
+# Project Manager Dashboard endpoints
+@api_router.get("/pm/dashboard")
+async def get_project_manager_dashboard(current_user: UserInDB = Depends(get_current_project_manager)):
+    """Get project manager dashboard analytics"""
+    
+    # Get projects the user can manage
+    if current_user.role == UserRole.ADMIN:
+        # Admin can see all projects
+        projects = await db.projects.find({}).to_list(1000)
+    else:
+        # Project managers can see projects they're assigned to
+        projects = await db.projects.find({
+            "$or": [
+                {"project_managers": current_user.id},
+                {"owner_id": current_user.id}
+            ]
+        }).to_list(1000)
+    
+    # Calculate project statistics
+    total_projects = len(projects)
+    active_projects = len([p for p in projects if p.get("status") == "active"])
+    completed_projects = len([p for p in projects if p.get("status") == "completed"])
+    at_risk_projects = len([p for p in projects if p.get("status") == "on_hold"])
+    
+    # Get tasks for these projects
+    project_ids = [p["id"] for p in projects]
+    tasks = await db.tasks.find({"project_id": {"$in": project_ids}}).to_list(1000)
+    
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.get("status") == "completed"])
+    in_progress_tasks = len([t for t in tasks if t.get("status") == "in_progress"])
+    overdue_tasks = len([t for t in tasks if t.get("due_date") and datetime.fromisoformat(t["due_date"].replace('Z', '+00:00')) < datetime.utcnow() and t.get("status") != "completed"])
+    blocked_tasks = len([t for t in tasks if t.get("status") == "blocked"])
+    
+    # Get team members across all projects
+    team_members = set()
+    for project in projects:
+        team_members.update(project.get("collaborators", []))
+        team_members.update(project.get("project_managers", []))
+        team_members.add(project.get("owner_id"))
+    
+    # Calculate team workload
+    team_workload = {}
+    for member_id in team_members:
+        if member_id:
+            member_tasks = [t for t in tasks if member_id in t.get("assigned_users", []) or member_id in t.get("collaborators", []) or t.get("owner_id") == member_id]
+            active_tasks = [t for t in member_tasks if t.get("status") in ["todo", "in_progress"]]
+            team_workload[member_id] = {
+                "total_tasks": len(member_tasks),
+                "active_tasks": len(active_tasks),
+                "completed_tasks": len([t for t in member_tasks if t.get("status") == "completed"])
+            }
+    
+    # Recent activity for projects
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_activities = await db.activity_logs.find({
+        "project_id": {"$in": project_ids},
+        "timestamp": {"$gte": week_ago}
+    }).sort("timestamp", -1).limit(20).to_list(20)
+    
+    return {
+        "overview": {
+            "total_projects": total_projects,
+            "active_projects": active_projects,
+            "completed_projects": completed_projects,
+            "at_risk_projects": at_risk_projects,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "in_progress_tasks": in_progress_tasks,
+            "overdue_tasks": overdue_tasks,
+            "blocked_tasks": blocked_tasks,
+            "team_size": len(team_members)
+        },
+        "projects": [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "status": p["status"],
+                "auto_calculated_status": p.get("auto_calculated_status", p["status"]),
+                "progress_percentage": p.get("progress_percentage", 0),
+                "task_count": p.get("task_count", 0),
+                "completed_task_count": p.get("completed_task_count", 0),
+                "start_date": p.get("start_date"),
+                "end_date": p.get("end_date"),
+                "assigned_teams": p.get("assigned_teams", []),
+                "project_managers": p.get("project_managers", []),
+                "updated_at": p.get("updated_at")
+            }
+            for p in projects
+        ],
+        "team_workload": team_workload,
+        "recent_activities": [
+            {
+                "id": a["id"],
+                "user_id": a["user_id"],
+                "action": a["action"],
+                "entity_type": a["entity_type"],
+                "entity_name": a["entity_name"],
+                "project_id": a.get("project_id"),
+                "timestamp": a["timestamp"]
+            }
+            for a in recent_activities
+        ]
+    }
+
+@api_router.get("/pm/projects")
+async def get_managed_projects(current_user: UserInDB = Depends(get_current_project_manager)):
+    """Get projects that the current user can manage"""
+    
+    if current_user.role == UserRole.ADMIN:
+        # Admin can see all projects
+        projects = await db.projects.find({}).to_list(1000)
+    else:
+        # Project managers can see projects they're assigned to
+        projects = await db.projects.find({
+            "$or": [
+                {"project_managers": current_user.id},
+                {"owner_id": current_user.id}
+            ]
+        }).to_list(1000)
+    
+    # Update project progress for all projects
+    for project in projects:
+        await update_project_progress(project["id"])
+    
+    # Re-fetch updated projects
+    updated_projects = await db.projects.find({
+        "id": {"$in": [p["id"] for p in projects]}
+    }).to_list(1000)
+    
+    return [Project(**project) for project in updated_projects]
+
+@api_router.put("/pm/projects/{project_id}/status")
+async def update_project_status(project_id: str, status_update: dict, current_user: UserInDB = Depends(get_current_project_manager)):
+    """Update project status (manual override)"""
+    
+    # Check if user can manage this project
+    if not await check_project_manager_access(project_id, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Update status override
+    new_status = status_update.get("status")
+    if new_status:
+        update_data = {
+            "status": new_status,
+            "status_override": new_status,
+            "updated_at": datetime.utcnow()
+        }
+        
+        await db.projects.update_one({"id": project_id}, {"$set": update_data})
+        
+        # Log activity
+        await log_activity(
+            user_id=current_user.id,
+            action="status_updated",
+            entity_type="project",
+            entity_id=project_id,
+            entity_name=project["name"],
+            project_id=project_id,
+            details={"old_status": project["status"], "new_status": new_status}
+        )
+        
+        # Create notifications for team members
+        team_members = set(project.get("collaborators", []) + project.get("project_managers", []))
+        if project.get("owner_id"):
+            team_members.add(project["owner_id"])
+        
+        for member_id in team_members:
+            if member_id != current_user.id:
+                await create_notification(
+                    user_id=member_id,
+                    title="Project Status Updated",
+                    message=f"Project '{project['name']}' status changed to {new_status}",
+                    notification_type="project_update",
+                    priority="medium",
+                    entity_type="project",
+                    entity_id=project_id,
+                    project_id=project_id
+                )
+    
+    return {"message": "Project status updated successfully"}
+
+@api_router.get("/pm/projects/{project_id}/tasks")
+async def get_project_tasks(project_id: str, current_user: UserInDB = Depends(get_current_project_manager)):
+    """Get tasks for a specific project"""
+    
+    # Check if user can manage this project
+    if not await check_project_manager_access(project_id, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    tasks = await db.tasks.find({"project_id": project_id}).sort("created_at", -1).to_list(1000)
+    return [Task(**task) for task in tasks]
+
+@api_router.get("/pm/projects/{project_id}/team")
+async def get_project_team(project_id: str, current_user: UserInDB = Depends(get_current_project_manager)):
+    """Get team members for a specific project"""
+    
+    # Check if user can manage this project
+    if not await check_project_manager_access(project_id, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get all team members
+    team_member_ids = set(project.get("collaborators", []) + project.get("project_managers", []))
+    if project.get("owner_id"):
+        team_member_ids.add(project["owner_id"])
+    
+    # Get user details
+    team_members = await db.users.find({"id": {"$in": list(team_member_ids)}}).to_list(1000)
+    
+    # Get task assignments for each member
+    project_tasks = await db.tasks.find({"project_id": project_id}).to_list(1000)
+    
+    member_workload = {}
+    for member in team_members:
+        member_id = member["id"]
+        member_tasks = [t for t in project_tasks if member_id in t.get("assigned_users", []) or member_id in t.get("collaborators", []) or t.get("owner_id") == member_id]
+        
+        active_tasks = [t for t in member_tasks if t.get("status") in ["todo", "in_progress"]]
+        completed_tasks = [t for t in member_tasks if t.get("status") == "completed"]
+        overdue_tasks = [t for t in member_tasks if t.get("due_date") and datetime.fromisoformat(t["due_date"].replace('Z', '+00:00')) < datetime.utcnow() and t.get("status") != "completed"]
+        
+        member_workload[member_id] = {
+            "user": {
+                "id": member["id"],
+                "username": member["username"],
+                "full_name": member["full_name"],
+                "email": member["email"],
+                "role": member["role"]
+            },
+            "tasks": {
+                "total": len(member_tasks),
+                "active": len(active_tasks),
+                "completed": len(completed_tasks),
+                "overdue": len(overdue_tasks)
+            },
+            "availability": "busy" if len(active_tasks) > 3 else "available"
+        }
+    
+    return list(member_workload.values())
+
+@api_router.get("/pm/activity")
+async def get_project_activity(current_user: UserInDB = Depends(get_current_project_manager), project_id: str = None, limit: int = 50):
+    """Get activity log for projects"""
+    
+    # Get projects the user can manage
+    if current_user.role == UserRole.ADMIN:
+        # Admin can see all projects
+        managed_projects = await db.projects.find({}).to_list(1000)
+    else:
+        # Project managers can see projects they're assigned to
+        managed_projects = await db.projects.find({
+            "$or": [
+                {"project_managers": current_user.id},
+                {"owner_id": current_user.id}
+            ]
+        }).to_list(1000)
+    
+    managed_project_ids = [p["id"] for p in managed_projects]
+    
+    # Build filter
+    filter_dict = {"project_id": {"$in": managed_project_ids}}
+    if project_id:
+        if project_id not in managed_project_ids:
+            raise HTTPException(status_code=403, detail="Access denied")
+        filter_dict["project_id"] = project_id
+    
+    activities = await db.activity_logs.find(filter_dict).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    return [
+        {
+            "id": a["id"],
+            "user_id": a["user_id"],
+            "action": a["action"],
+            "entity_type": a["entity_type"],
+            "entity_name": a["entity_name"],
+            "project_id": a.get("project_id"),
+            "details": a.get("details", {}),
+            "timestamp": a["timestamp"]
+        }
+        for a in activities
+    ]
+
+@api_router.get("/pm/notifications")
+async def get_project_notifications(current_user: UserInDB = Depends(get_current_project_manager), unread_only: bool = False):
+    """Get notifications for project manager"""
+    
+    filter_dict = {"user_id": current_user.id}
+    if unread_only:
+        filter_dict["read"] = False
+    
+    notifications = await db.notifications.find(filter_dict).sort("created_at", -1).limit(100).to_list(100)
+    
+    return [
+        {
+            "id": n["id"],
+            "title": n["title"],
+            "message": n["message"],
+            "type": n["type"],
+            "priority": n["priority"],
+            "read": n["read"],
+            "entity_type": n.get("entity_type"),
+            "entity_id": n.get("entity_id"),
+            "project_id": n.get("project_id"),
+            "action_url": n.get("action_url"),
+            "created_at": n["created_at"]
+        }
+        for n in notifications
+    ]
+
+@api_router.put("/pm/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: UserInDB = Depends(get_current_project_manager)):
+    """Mark a notification as read"""
+    
+    result = await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification marked as read"}
+
 # Include router
 app.include_router(api_router)
 
