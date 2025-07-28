@@ -1293,6 +1293,13 @@ class TaskManagementTester:
             "role": "user"
         }
         
+        # Store tokens for later use
+        self.pm_token = None
+        self.admin_token = None
+        self.regular_token = None
+        self.pm_user_id = None
+        self.admin_user_id = None
+        
         # Register users
         try:
             pm_response = self.session.post(f"{BACKEND_URL}/auth/register", json=pm_user_data)
@@ -1300,22 +1307,21 @@ class TaskManagementTester:
             regular_response = self.session.post(f"{BACKEND_URL}/auth/register", json=regular_user_data)
             
             if pm_response.status_code == 200:
-                pm_token = pm_response.json()["access_token"]
-                self.test_data['users'].append({"token": pm_token, "role": "project_manager", "id": pm_response.json()["user"]["id"]})
+                self.pm_token = pm_response.json()["access_token"]
+                self.pm_user_id = pm_response.json()["user"]["id"]
                 self.log_result("Project Manager Registration", True, "PM user registered successfully")
             else:
                 self.log_result("Project Manager Registration", False, f"Status: {pm_response.status_code}")
                 
             if admin_response.status_code == 200:
-                admin_token = admin_response.json()["access_token"]
-                self.test_data['users'].append({"token": admin_token, "role": "admin", "id": admin_response.json()["user"]["id"]})
+                self.admin_token = admin_response.json()["access_token"]
+                self.admin_user_id = admin_response.json()["user"]["id"]
                 self.log_result("Admin User Registration", True, "Admin user registered successfully")
             else:
                 self.log_result("Admin User Registration", False, f"Status: {admin_response.status_code}")
                 
             if regular_response.status_code == 200:
-                regular_token = regular_response.json()["access_token"]
-                self.test_data['users'].append({"token": regular_token, "role": "user", "id": regular_response.json()["user"]["id"]})
+                self.regular_token = regular_response.json()["access_token"]
                 self.log_result("Regular User Registration", True, "Regular user registered successfully")
             else:
                 self.log_result("Regular User Registration", False, f"Status: {regular_response.status_code}")
@@ -1325,9 +1331,13 @@ class TaskManagementTester:
             return
         
         # Test PM endpoint access with different roles
-        pm_headers = {"Authorization": f"Bearer {pm_token}"}
-        admin_headers = {"Authorization": f"Bearer {admin_token}"}
-        regular_headers = {"Authorization": f"Bearer {regular_token}"}
+        if not self.pm_token or not self.admin_token or not self.regular_token:
+            self.log_result("Token Setup", False, "Failed to get all required tokens")
+            return
+            
+        pm_headers = {"Authorization": f"Bearer {self.pm_token}"}
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        regular_headers = {"Authorization": f"Bearer {self.regular_token}"}
         
         # Test PM access to PM dashboard
         try:
@@ -1363,23 +1373,20 @@ class TaskManagementTester:
         """Test all PM dashboard endpoints"""
         print("\n📊 Testing Project Manager Dashboard Endpoints...")
         
-        # Get PM and admin tokens
-        pm_user = next((u for u in self.test_data['users'] if u['role'] == 'project_manager'), None)
-        admin_user = next((u for u in self.test_data['users'] if u['role'] == 'admin'), None)
-        
-        if not pm_user or not admin_user:
-            self.log_result("PM Dashboard Endpoints", False, "PM or Admin user not found")
+        # Check if we have the required tokens
+        if not hasattr(self, 'pm_token') or not hasattr(self, 'admin_token') or not self.pm_token or not self.admin_token:
+            self.log_result("PM Dashboard Endpoints", False, "PM or Admin token not available")
             return
             
-        pm_headers = {"Authorization": f"Bearer {pm_user['token']}"}
-        admin_headers = {"Authorization": f"Bearer {admin_user['token']}"}
+        pm_headers = {"Authorization": f"Bearer {self.pm_token}"}
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
         
         # Create test project with PM assigned
         project_data = {
             "name": "PM Test Project",
             "description": "Project for testing PM functionality",
-            "project_managers": [pm_user['id']],
-            "collaborators": [admin_user['id']]
+            "project_managers": [self.pm_user_id],
+            "collaborators": [self.admin_user_id]
         }
         
         try:
@@ -1395,7 +1402,7 @@ class TaskManagementTester:
                     "description": "Task for PM testing",
                     "project_id": project_id,
                     "priority": "high",
-                    "assigned_users": [pm_user['id']]
+                    "assigned_users": [self.pm_user_id]
                 }
                 
                 task_response = self.session.post(f"{BACKEND_URL}/tasks", json=task_data, headers=admin_headers)
@@ -1558,16 +1565,13 @@ class TaskManagementTester:
         """Test activity logging and notification creation"""
         print("\n📝 Testing Activity Logging & Notifications...")
         
-        # Get PM user
-        pm_user = next((u for u in self.test_data['users'] if u['role'] == 'project_manager'), None)
-        admin_user = next((u for u in self.test_data['users'] if u['role'] == 'admin'), None)
-        
-        if not pm_user or not admin_user:
-            self.log_result("Activity Logging Setup", False, "PM or Admin user not found")
+        # Check if we have the required tokens
+        if not hasattr(self, 'pm_token') or not hasattr(self, 'admin_token') or not self.pm_token or not self.admin_token:
+            self.log_result("Activity Logging Setup", False, "PM or Admin token not available")
             return
             
-        pm_headers = {"Authorization": f"Bearer {pm_user['token']}"}
-        admin_headers = {"Authorization": f"Bearer {admin_user['token']}"}
+        pm_headers = {"Authorization": f"Bearer {self.pm_token}"}
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
         
         # Get existing project
         if not self.test_data['projects']:
@@ -1663,23 +1667,20 @@ class TaskManagementTester:
         """Test project status calculation and progress tracking"""
         print("\n📈 Testing Project Status & Progress...")
         
-        # Get admin user for project creation
-        admin_user = next((u for u in self.test_data['users'] if u['role'] == 'admin'), None)
-        pm_user = next((u for u in self.test_data['users'] if u['role'] == 'project_manager'), None)
-        
-        if not admin_user or not pm_user:
-            self.log_result("Project Status Testing Setup", False, "Admin or PM user not found")
+        # Check if we have the required tokens
+        if not hasattr(self, 'pm_token') or not hasattr(self, 'admin_token') or not self.pm_token or not self.admin_token:
+            self.log_result("Project Status Testing Setup", False, "PM or Admin token not available")
             return
             
-        admin_headers = {"Authorization": f"Bearer {admin_user['token']}"}
-        pm_headers = {"Authorization": f"Bearer {pm_user['token']}"}
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        pm_headers = {"Authorization": f"Bearer {self.pm_token}"}
         
         # Create a new project for status testing
         project_data = {
             "name": "Status Test Project",
             "description": "Project for testing status calculation",
-            "project_managers": [pm_user['id']],
-            "collaborators": [admin_user['id']]
+            "project_managers": [self.pm_user_id],
+            "collaborators": [self.admin_user_id]
         }
         
         try:
