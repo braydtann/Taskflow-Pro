@@ -240,14 +240,19 @@ class Project(BaseModel):
     name: str
     description: Optional[str] = None
     status: ProjectStatus = ProjectStatus.ACTIVE
+    auto_calculated_status: ProjectStatus = ProjectStatus.ACTIVE  # Auto-calculated based on tasks
+    status_override: Optional[ProjectStatus] = None  # Manual override by project manager
     owner_id: str  # User who owns this project
     collaborators: List[str] = []  # User IDs with access to this project
+    project_managers: List[str] = []  # User IDs who can manage this project
+    assigned_teams: List[str] = []  # Team IDs assigned to this project
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     task_count: int = 0
     completed_task_count: int = 0
+    progress_percentage: float = 0.0  # Calculated progress based on task completion
 
 class PerformanceMetrics(BaseModel):
     user_id: str
