@@ -2138,10 +2138,30 @@ class TaskManagementTester:
         print(f"Backend URL: {BACKEND_URL}")
         print("=" * 90)
         
-        # Test sequence - Authentication first, then new team and search functionality
-        tests = [
+        # Test sequence - Authentication first, then PM role functionality, then core features
+        print("\n🎯 PHASE 1: PROJECT MANAGER ROLE TESTING")
+        print("=" * 60)
+        
+        pm_role_tests = [
             self.test_api_connectivity,
             self.test_user_authentication,
+            self.test_user_creation_with_project_manager_role,
+            self.test_pm_user_authentication_and_access,
+            self.test_admin_user_management_with_pm_role,
+            self.test_comprehensive_role_based_access_control
+        ]
+        
+        for test in pm_role_tests:
+            try:
+                test()
+                time.sleep(1)  # Brief pause between tests
+            except Exception as e:
+                self.log_result(test.__name__, False, f"Test execution error: {str(e)}")
+        
+        print("\n🔧 PHASE 2: CORE FUNCTIONALITY TESTING")
+        print("=" * 60)
+        
+        core_tests = [
             self.test_project_crud,
             self.test_task_crud_with_analytics,
             self.test_team_assignment_functionality,
@@ -2159,7 +2179,7 @@ class TaskManagementTester:
             self.test_error_handling
         ]
         
-        for test in tests:
+        for test in core_tests:
             try:
                 test()
                 time.sleep(1)  # Brief pause between tests
@@ -2167,9 +2187,8 @@ class TaskManagementTester:
                 self.log_result(test.__name__, False, f"Test execution error: {str(e)}")
         
         # Test Project Manager Dashboard functionality
-        print("\n" + "=" * 80)
-        print("🎯 TESTING PROJECT MANAGER DASHBOARD FUNCTIONALITY")
-        print("=" * 80)
+        print("\n🎯 PHASE 3: PROJECT MANAGER DASHBOARD FUNCTIONALITY")
+        print("=" * 60)
         self.test_project_manager_authentication()
         self.test_project_manager_dashboard_endpoints()
         self.test_activity_logging_and_notifications()
@@ -2179,9 +2198,9 @@ class TaskManagementTester:
         self.cleanup_test_data()
         
         # Final results
-        print("\n" + "=" * 80)
-        print("🏁 FINAL TEST RESULTS - PROJECT MANAGER DASHBOARD TESTING")
-        print("=" * 80)
+        print("\n" + "=" * 90)
+        print("🏁 FINAL TEST RESULTS - PROJECT MANAGER ROLE COMPREHENSIVE TESTING")
+        print("=" * 90)
         print(f"✅ Passed: {self.results['passed']}")
         print(f"❌ Failed: {self.results['failed']}")
         print(f"📊 Success Rate: {(self.results['passed'] / (self.results['passed'] + self.results['failed']) * 100):.1f}%")
