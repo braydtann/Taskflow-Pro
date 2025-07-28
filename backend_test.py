@@ -1254,13 +1254,22 @@ class TaskManagementTester:
         # Delete test tasks
         for task in self.test_data['tasks']:
             try:
-                response = self.session.delete(f"{BACKEND_URL}/tasks/{task['id']}")
-                if response.status_code == 200:
-                    print(f"✅ Deleted task: {task['title']}")
+                # Handle both task objects and task IDs
+                if isinstance(task, dict):
+                    task_id = task.get('id')
+                    task_title = task.get('title', 'Unknown Task')
                 else:
-                    print(f"❌ Failed to delete task: {task['title']}")
+                    task_id = task
+                    task_title = f"Task {task_id[:8]}..."
+                
+                if task_id:
+                    response = self.session.delete(f"{BACKEND_URL}/tasks/{task_id}")
+                    if response.status_code == 200:
+                        print(f"✅ Deleted task: {task_title}")
+                    else:
+                        print(f"❌ Failed to delete task: {task_title}")
             except Exception as e:
-                print(f"❌ Error deleting task {task['title']}: {str(e)}")
+                print(f"❌ Error deleting task: {str(e)}")
         
         print(f"Cleanup completed")
 
