@@ -871,6 +871,21 @@ async def create_task(task_data: TaskCreate, current_user: UserInDB = Depends(ge
     task = Task(**task_dict)
     await db.tasks.insert_one(task.dict())
     
+    # Log activity
+    await log_activity(
+        user_id=current_user.id,
+        action="created",
+        entity_type="task",
+        entity_id=task.id,
+        entity_name=task.title,
+        project_id=task.project_id,
+        details={"priority": task.priority, "status": task.status}
+    )
+    
+    # Update project progress if task belongs to a project
+    if task.project_id:
+        await update_project_progress(task.project_id)
+    
     # Broadcast real-time update to collaborators
     await manager.broadcast_task_update(task.dict(), "created", current_user.id)
     
