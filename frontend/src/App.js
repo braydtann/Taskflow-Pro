@@ -128,10 +128,60 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   useEffect(() => {
     fetchAnalytics();
     fetchTodaysTasks();
   }, []);
+
+  // Search handler with debounce
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        performSearch();
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchQuery]);
+
+  const performSearch = async () => {
+    if (searchQuery.trim().length < 2) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await axios.get(`${API}/tasks/search/${encodeURIComponent(searchQuery.trim())}`);
+      setSearchResults(response.data);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error("Error searching tasks:", error);
+      setSearchResults([]);
+    }
+    setIsSearching(false);
+  };
+
+  const handleSearchTaskClick = (task) => {
+    // Navigate to tasks view and scroll to specific task
+    window.location.href = '/tasks';
+    localStorage.setItem('scrollToTaskId', task.id);
+    // Clear search
+    setSearchQuery("");
+    setShowSearchResults(false);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
 
   const fetchAnalytics = async () => {
     try {
