@@ -375,31 +375,33 @@ const DraggableKanbanCard = ({ task, onEdit, onDelete, onStatusChange, onTaskUpd
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       className={`kanban-card draggable ${task.is_timer_running ? 'kanban-card-timer-active' : ''}`}
       data-task-id={task.id}
     >
-      <div className="kanban-card-header">
-        <h4 className="kanban-card-title">{task.title}</h4>
-        <div className="kanban-card-actions">
-          <button onClick={() => onEdit(task)} className="action-btn edit-btn-small">
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
-            </svg>
-          </button>
-          <button onClick={() => onDelete(task.id)} className="action-btn delete-btn-small">
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12z"/>
-            </svg>
-          </button>
+      {/* Drag handle area */}
+      <div {...listeners} className="kanban-card-drag-handle">
+        <div className="kanban-card-header">
+          <h4 className="kanban-card-title">{task.title}</h4>
+          <div className="kanban-card-actions">
+            <button onClick={() => onEdit(task)} className="action-btn edit-btn-small">
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+              </svg>
+            </button>
+            <button onClick={() => onDelete(task.id)} className="action-btn delete-btn-small">
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12z"/>
+              </svg>
+            </button>
+          </div>
         </div>
+        
+        {task.description && (
+          <p className="kanban-card-description">{task.description}</p>
+        )}
       </div>
-      
-      {task.description && (
-        <p className="kanban-card-description">{task.description}</p>
-      )}
 
-      {/* Timer Section for Kanban */}
+      {/* Timer Section for Kanban - NO DRAG LISTENERS */}
       <div className="kanban-timer-section">
         <TimerControls 
           task={task} 
