@@ -13,7 +13,7 @@ import random
 import string
 
 # Configuration
-BACKEND_URL = "https://34c353d5-13c6-4f3d-b463-fb80eaba5a2e.preview.emergentagent.com/api"
+BACKEND_URL = "https://9b427bd1-3e37-401f-bf28-80af2a6bf86c.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 def generate_test_user_data():
