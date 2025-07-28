@@ -266,6 +266,7 @@ class TaskCreate(BaseModel):
     estimated_duration: Optional[int] = None
     due_date: Optional[datetime] = None
     assigned_users: List[str] = []
+    assigned_teams: List[str] = []
     collaborators: List[str] = []
     tags: List[str] = []
 
