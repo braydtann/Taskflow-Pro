@@ -370,6 +370,108 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Quick Search Section */}
+      <div className="dashboard-search-section">
+        <div className="search-container">
+          <div className="search-header">
+            <h3 className="search-title">🔍 Quick Task Search</h3>
+            <p className="search-subtitle">Find tasks by title across all your projects</p>
+          </div>
+          
+          <div className="search-input-container">
+            <div className="search-input-wrapper">
+              <svg className="search-icon" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M21 19l-5.154-5.154a8 8 0 10-2.846 2.846L19 21l2-2zm-9-4a6 6 0 116-6 6 6 0 01-6 6z"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search tasks by title... (min 2 characters)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              {searchQuery && (
+                <button onClick={clearSearch} className="search-clear-btn">
+                  <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            {isSearching && (
+              <div className="search-loading">Searching...</div>
+            )}
+          </div>
+          
+          {/* Search Results */}
+          {showSearchResults && (
+            <div className="search-results">
+              <div className="search-results-header">
+                <span className="search-results-count">
+                  {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
+                </span>
+              </div>
+              
+              {searchResults.length > 0 ? (
+                <ul className="search-results-list">
+                  {searchResults.map(task => (
+                    <li 
+                      key={task.id}
+                      className="search-result-item"
+                      onClick={() => handleSearchTaskClick(task)}
+                    >
+                      <div className="search-result-content">
+                        <div className="search-result-main">
+                          <span className="search-result-title">{task.title}</span>
+                          <div className="search-result-badges">
+                            <span className={`search-result-priority priority-${task.priority}`}>
+                              {task.priority === 'urgent' && '🔥'}
+                              {task.priority === 'high' && '⚡'}
+                              {task.priority === 'medium' && '📋'}
+                              {task.priority === 'low' && '📝'}
+                            </span>
+                            <span className={`search-result-status status-${task.status}`}>
+                              {task.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="search-result-meta">
+                          {task.project_name && (
+                            <span className="search-result-project">📁 {task.project_name}</span>
+                          )}
+                          {task.description && (
+                            <span className="search-result-description">{task.description.substring(0, 100)}...</span>
+                          )}
+                          {task.due_date && (
+                            <span className="search-result-due">
+                              📅 Due {new Date(task.due_date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="search-result-arrow">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9 6l6 6-6 6"/>
+                        </svg>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="search-no-results">
+                  <div className="search-no-results-content">
+                    <div className="search-no-results-icon">🔍</div>
+                    <p className="search-no-results-message">No tasks found matching "{searchQuery}"</p>
+                    <p className="search-no-results-hint">Try different keywords or check your spelling</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Personal Stats Cards */}
       <div className="stats-grid">
         <div className="stats-card stats-card-total">
