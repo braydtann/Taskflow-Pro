@@ -1359,6 +1359,11 @@ body {
   color: #0277bd;
 }
 
+.role-project_manager {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
