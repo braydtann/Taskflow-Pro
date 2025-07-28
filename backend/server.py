@@ -1120,6 +1120,11 @@ async def update_task(task_id: str, task_update: TaskUpdate, current_user: UserI
     update_dict = {k: v for k, v in task_update.dict().items() if v is not None}
     update_dict["updated_at"] = datetime.utcnow()
     
+    # Track status changes for activity logging
+    status_changed = False
+    old_status = task.get("status")
+    new_status = update_dict.get("status")
+    
     # Handle status change to completed
     if update_dict.get("status") == "completed" and task.get("status") != "completed":
         update_dict["completed_at"] = datetime.utcnow()
@@ -1129,9 +1134,53 @@ async def update_task(task_id: str, task_update: TaskUpdate, current_user: UserI
                 {"id": task["project_id"]},
                 {"$inc": {"completed_task_count": 1}, "$set": {"updated_at": datetime.utcnow()}}
             )
+        status_changed = True
+    elif new_status and old_status != new_status:
+        status_changed = True
     
     await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
     updated_task = await db.tasks.find_one({"id": task_id})
+    
+    # Log activity
+    activity_details = {}
+    if status_changed:
+        activity_details["status_change"] = {"from": old_status, "to": new_status}
+    
+    await log_activity(
+        user_id=current_user.id,
+        action="updated",
+        entity_type="task",
+        entity_id=task_id,
+        entity_name=task["title"],
+        project_id=task.get("project_id"),
+        details=activity_details
+    )
+    
+    # Update project progress if task belongs to a project
+    if task.get("project_id"):
+        await update_project_progress(task["project_id"])
+    
+    # Create notifications for status changes
+    if status_changed and new_status in ["blocked", "overdue"]:
+        # Get project managers and team members
+        if task.get("project_id"):
+            project = await db.projects.find_one({"id": task["project_id"]})
+            if project:
+                notify_users = set(project.get("project_managers", []))
+                notify_users.add(project.get("owner_id"))
+                
+                for user_id in notify_users:
+                    if user_id and user_id != current_user.id:
+                        await create_notification(
+                            user_id=user_id,
+                            title=f"Task Status Alert",
+                            message=f"Task '{task['title']}' is now {new_status}",
+                            notification_type="task_status_alert",
+                            priority="high" if new_status == "blocked" else "medium",
+                            entity_type="task",
+                            entity_id=task_id,
+                            project_id=task.get("project_id")
+                        )
     
     # Broadcast real-time update to collaborators
     await manager.broadcast_task_update(updated_task, "updated", current_user.id)
