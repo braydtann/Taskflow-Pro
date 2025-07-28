@@ -729,8 +729,9 @@ async def get_tasks(
     # 1. Own
     # 2. Are assigned to
     # 3. Collaborate on
-    # 4. Belong to projects they have access to (owner or collaborator)
-    # 5. Belong to projects their teams have access to
+    # 4. Are assigned to their teams
+    # 5. Belong to projects they have access to (owner or collaborator)
+    # 6. Belong to projects their teams have access to
     filter_dict = {
         "$or": [
             {"owner_id": current_user.id},
@@ -738,6 +739,10 @@ async def get_tasks(
             {"collaborators": current_user.id}
         ]
     }
+    
+    # Add team-assigned tasks if user has teams
+    if user_teams:
+        filter_dict["$or"].append({"assigned_teams": {"$in": user_teams}})
     
     # Add project-based access if user has teams or project access
     project_access_conditions = []
