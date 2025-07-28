@@ -4481,20 +4481,54 @@ body {
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border: 2px solid transparent;
-  cursor: grab;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-}
-
-.kanban-card.draggable:active {
-  cursor: grabbing;
 }
 
 .kanban-card.draggable:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border-color: #7c3aed;
+}
+
+/* Drag Handle Area */
+.kanban-card-drag-handle {
+  cursor: grab;
+  position: relative;
+}
+
+.kanban-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+.kanban-card-drag-handle:hover {
+  background: rgba(124, 58, 237, 0.02);
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px;
+}
+
+/* Metadata area - also draggable */
+.kanban-card-metadata {
+  cursor: grab;
+  position: relative;
+}
+
+.kanban-card-metadata:active {
+  cursor: grabbing;
+}
+
+/* Timer section - NOT draggable */
+.kanban-timer-section {
+  cursor: default;
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 8px 0;
+  border: 1px solid rgba(124, 58, 237, 0.1);
 }
 
 .kanban-card-header {
