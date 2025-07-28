@@ -139,6 +139,7 @@ class ProjectStatus(str, Enum):
 
 class UserRole(str, Enum):
     USER = "user"
+    PROJECT_MANAGER = "project_manager"
     ADMIN = "admin"
 
 # Authentication Models
