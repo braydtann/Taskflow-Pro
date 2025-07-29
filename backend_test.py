@@ -2203,6 +2203,13 @@ class TaskManagementTester:
         self.test_activity_logging_and_notifications()
         self.test_project_status_and_progress()
         
+        # Test Enhanced Analytics Dashboard functionality
+        print("\n🎯 PHASE 4: ENHANCED ANALYTICS DASHBOARD TESTING")
+        print("=" * 60)
+        self.test_enhanced_pm_dashboard_analytics()
+        self.test_enhanced_admin_dashboard_analytics()
+        self.test_analytics_performance_and_edge_cases()
+        
         # Cleanup
         self.cleanup_test_data()
         
