@@ -2141,6 +2141,269 @@ class TaskManagementTester:
             self.log_result("Comprehensive Role-Based Access Control", False, f"Error: {str(e)}")
             return False
 
+    def test_enhanced_pm_dashboard_analytics(self):
+        """Test Enhanced PM Dashboard Analytics"""
+        print("\n=== Testing Enhanced PM Dashboard Analytics ===")
+        
+        if not self.test_data['users']:
+            self.log_result("Enhanced PM Dashboard Setup", False, "No authenticated users available")
+            return False
+        
+        # Create a project manager user for testing
+        pm_user_data = {
+            "email": f"pm_user_{uuid.uuid4().hex[:8]}@example.com",
+            "username": f"pm_user_{uuid.uuid4().hex[:6]}",
+            "full_name": "Project Manager Test User",
+            "password": "SecurePass123!",
+            "role": "project_manager"
+        }
+        
+        try:
+            # Register PM user
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=pm_user_data)
+            if response.status_code == 200:
+                pm_token_data = response.json()
+                pm_headers = {'Authorization': f"Bearer {pm_token_data['access_token']}"}
+                self.log_result("PM User Registration", True, f"PM user registered: {pm_user_data['username']}")
+            else:
+                self.log_result("PM User Registration", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test Enhanced PM Dashboard endpoint
+            response = self.session.get(f"{BACKEND_URL}/pm/dashboard", headers=pm_headers)
+            if response.status_code == 200:
+                dashboard_data = response.json()
+                
+                # Check enhanced overview metrics
+                if 'overview' in dashboard_data:
+                    overview = dashboard_data['overview']
+                    enhanced_fields = [
+                        'tasks_assigned_to_me', 'tasks_scheduled_this_week', 
+                        'task_hours_scheduled_this_week', 'past_deadline_tasks',
+                        'completed_tasks_this_week', 'completed_task_hours_this_week'
+                    ]
+                    
+                    missing_fields = [field for field in enhanced_fields if field not in overview]
+                    if not missing_fields:
+                        self.log_result("Enhanced PM Overview Metrics", True, f"All enhanced metrics present: {enhanced_fields}")
+                    else:
+                        self.log_result("Enhanced PM Overview Metrics", False, f"Missing enhanced metrics: {missing_fields}")
+                else:
+                    self.log_result("Enhanced PM Overview Metrics", False, "No overview section in PM dashboard")
+                
+                # Check analytics object
+                if 'analytics' in dashboard_data:
+                    analytics = dashboard_data['analytics']
+                    required_analytics = [
+                        'tasks_by_project', 'tasks_by_team', 'projects_by_eta',
+                        'tasks_by_assignee', 'completed_hours_weekly', 'team_completion_estimates'
+                    ]
+                    
+                    missing_analytics = [field for field in required_analytics if field not in analytics]
+                    if not missing_analytics:
+                        self.log_result("Enhanced PM Analytics Object", True, f"All analytics sections present: {required_analytics}")
+                        
+                        # Verify analytics data structure
+                        if isinstance(analytics['tasks_by_project'], dict):
+                            self.log_result("Tasks by Project Analytics", True, f"Found {len(analytics['tasks_by_project'])} projects in analytics")
+                        else:
+                            self.log_result("Tasks by Project Analytics", False, "tasks_by_project is not a dictionary")
+                        
+                        if isinstance(analytics['tasks_by_team'], dict):
+                            self.log_result("Tasks by Team Analytics", True, f"Found {len(analytics['tasks_by_team'])} teams in analytics")
+                        else:
+                            self.log_result("Tasks by Team Analytics", False, "tasks_by_team is not a dictionary")
+                        
+                        if isinstance(analytics['completed_hours_weekly'], list):
+                            self.log_result("Completed Hours Weekly", True, f"Found {len(analytics['completed_hours_weekly'])} weeks of data")
+                        else:
+                            self.log_result("Completed Hours Weekly", False, "completed_hours_weekly is not a list")
+                    else:
+                        self.log_result("Enhanced PM Analytics Object", False, f"Missing analytics sections: {missing_analytics}")
+                else:
+                    self.log_result("Enhanced PM Analytics Object", False, "No analytics section in PM dashboard")
+                
+                # Test data consistency
+                if 'overview' in dashboard_data and 'analytics' in dashboard_data:
+                    overview = dashboard_data['overview']
+                    analytics = dashboard_data['analytics']
+                    
+                    # Verify that overview metrics align with analytics data
+                    total_projects = overview.get('total_projects', 0)
+                    projects_in_analytics = len(analytics.get('tasks_by_project', {}))
+                    
+                    if total_projects >= 0 and projects_in_analytics >= 0:
+                        self.log_result("PM Dashboard Data Consistency", True, f"Overview shows {total_projects} projects, analytics covers {projects_in_analytics} projects")
+                    else:
+                        self.log_result("PM Dashboard Data Consistency", False, "Inconsistent project counts between overview and analytics")
+                
+                return True
+            else:
+                self.log_result("Enhanced PM Dashboard", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Enhanced PM Dashboard Analytics", False, f"Error: {str(e)}")
+            return False
+
+    def test_enhanced_admin_dashboard_analytics(self):
+        """Test Enhanced Admin Dashboard Analytics"""
+        print("\n=== Testing Enhanced Admin Dashboard Analytics ===")
+        
+        if not self.test_data['users']:
+            self.log_result("Enhanced Admin Dashboard Setup", False, "No authenticated users available")
+            return False
+        
+        # Create an admin user for testing
+        admin_user_data = {
+            "email": f"admin_user_{uuid.uuid4().hex[:8]}@example.com",
+            "username": f"admin_user_{uuid.uuid4().hex[:6]}",
+            "full_name": "Admin Test User",
+            "password": "SecurePass123!",
+            "role": "admin"
+        }
+        
+        try:
+            # Register Admin user
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=admin_user_data)
+            if response.status_code == 200:
+                admin_token_data = response.json()
+                admin_headers = {'Authorization': f"Bearer {admin_token_data['access_token']}"}
+                self.log_result("Admin User Registration", True, f"Admin user registered: {admin_user_data['username']}")
+            else:
+                self.log_result("Admin User Registration", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+            
+            # Test Enhanced Admin Dashboard endpoint
+            response = self.session.get(f"{BACKEND_URL}/admin/analytics/dashboard", headers=admin_headers)
+            if response.status_code == 200:
+                dashboard_data = response.json()
+                
+                # Check enhanced overview metrics (same as PM dashboard plus project_manager_users count)
+                if 'overview' in dashboard_data:
+                    overview = dashboard_data['overview']
+                    enhanced_fields = [
+                        'tasks_scheduled_this_week', 'task_hours_scheduled_this_week', 
+                        'past_deadline_tasks', 'completed_tasks_this_week', 
+                        'completed_task_hours_this_week', 'project_manager_users'
+                    ]
+                    
+                    missing_fields = [field for field in enhanced_fields if field not in overview]
+                    if not missing_fields:
+                        self.log_result("Enhanced Admin Overview Metrics", True, f"All enhanced metrics present: {enhanced_fields}")
+                        
+                        # Verify project_manager_users count
+                        pm_count = overview.get('project_manager_users', 0)
+                        if pm_count >= 0:
+                            self.log_result("Project Manager Users Count", True, f"Found {pm_count} project manager users")
+                        else:
+                            self.log_result("Project Manager Users Count", False, "Invalid project manager users count")
+                    else:
+                        self.log_result("Enhanced Admin Overview Metrics", False, f"Missing enhanced metrics: {missing_fields}")
+                else:
+                    self.log_result("Enhanced Admin Overview Metrics", False, "No overview section in admin dashboard")
+                
+                # Check analytics object (same structure as PM dashboard)
+                if 'analytics' in dashboard_data:
+                    analytics = dashboard_data['analytics']
+                    required_analytics = [
+                        'tasks_by_project', 'tasks_by_team', 'projects_by_eta',
+                        'tasks_by_assignee', 'completed_hours_weekly', 'team_completion_estimates'
+                    ]
+                    
+                    missing_analytics = [field for field in required_analytics if field not in analytics]
+                    if not missing_analytics:
+                        self.log_result("Enhanced Admin Analytics Object", True, f"All analytics sections present: {required_analytics}")
+                        
+                        # Verify analytics data structure
+                        if isinstance(analytics['projects_by_eta'], dict):
+                            eta_categories = list(analytics['projects_by_eta'].keys())
+                            expected_categories = ["On Time", "At Risk", "Overdue", "No Deadline"]
+                            if all(cat in eta_categories for cat in expected_categories):
+                                self.log_result("Projects by ETA Analytics", True, f"All ETA categories present: {expected_categories}")
+                            else:
+                                self.log_result("Projects by ETA Analytics", False, f"Missing ETA categories. Found: {eta_categories}")
+                        else:
+                            self.log_result("Projects by ETA Analytics", False, "projects_by_eta is not a dictionary")
+                        
+                        if isinstance(analytics['team_completion_estimates'], dict):
+                            self.log_result("Team Completion Estimates", True, f"Found estimates for {len(analytics['team_completion_estimates'])} teams")
+                        else:
+                            self.log_result("Team Completion Estimates", False, "team_completion_estimates is not a dictionary")
+                    else:
+                        self.log_result("Enhanced Admin Analytics Object", False, f"Missing analytics sections: {missing_analytics}")
+                else:
+                    self.log_result("Enhanced Admin Analytics Object", False, "No analytics section in admin dashboard")
+                
+                # Test admin-specific features
+                if 'top_teams' in dashboard_data and 'most_active_users' in dashboard_data:
+                    top_teams = dashboard_data['top_teams']
+                    most_active_users = dashboard_data['most_active_users']
+                    
+                    if isinstance(top_teams, list) and isinstance(most_active_users, list):
+                        self.log_result("Admin-Specific Analytics", True, f"Top teams: {len(top_teams)}, Most active users: {len(most_active_users)}")
+                    else:
+                        self.log_result("Admin-Specific Analytics", False, "top_teams or most_active_users not in correct format")
+                else:
+                    self.log_result("Admin-Specific Analytics", False, "Missing admin-specific analytics sections")
+                
+                return True
+            else:
+                self.log_result("Enhanced Admin Dashboard", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            self.log_result("Enhanced Admin Dashboard Analytics", False, f"Error: {str(e)}")
+            return False
+
+    def test_analytics_performance_and_edge_cases(self):
+        """Test Analytics Performance and Edge Cases"""
+        print("\n=== Testing Analytics Performance and Edge Cases ===")
+        
+        if not self.test_data['users']:
+            self.log_result("Analytics Performance Setup", False, "No authenticated users available")
+            return False
+        
+        user1 = self.test_data['users'][0]
+        
+        try:
+            # Test with empty data scenario
+            response = self.session.get(f"{BACKEND_URL}/analytics/dashboard", headers=user1['headers'])
+            if response.status_code == 200:
+                analytics = response.json()
+                
+                # Verify graceful handling of empty data
+                overview = analytics.get('overview', {})
+                if 'completion_rate' in overview:
+                    completion_rate = overview['completion_rate']
+                    if isinstance(completion_rate, (int, float)) and completion_rate >= 0:
+                        self.log_result("Empty Data Handling", True, f"Completion rate calculated correctly: {completion_rate}%")
+                    else:
+                        self.log_result("Empty Data Handling", False, f"Invalid completion rate: {completion_rate}")
+                else:
+                    self.log_result("Empty Data Handling", False, "Missing completion_rate in overview")
+            else:
+                self.log_result("Empty Data Handling", False, f"HTTP {response.status_code}")
+            
+            # Test performance with multiple requests
+            start_time = time.time()
+            for i in range(3):
+                response = self.session.get(f"{BACKEND_URL}/analytics/dashboard", headers=user1['headers'])
+                if response.status_code != 200:
+                    self.log_result("Analytics Performance", False, f"Request {i+1} failed: HTTP {response.status_code}")
+                    return False
+            
+            end_time = time.time()
+            avg_response_time = (end_time - start_time) / 3
+            
+            if avg_response_time < 5.0:  # 5 seconds threshold
+                self.log_result("Analytics Performance", True, f"Average response time: {avg_response_time:.2f}s (acceptable)")
+            else:
+                self.log_result("Analytics Performance", False, f"Average response time: {avg_response_time:.2f}s (too slow)")
+            
+            return True
+        except Exception as e:
+            self.log_result("Analytics Performance and Edge Cases", False, f"Error: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all backend tests including team assignment and search functionality"""
         print("🚀 Starting Comprehensive Backend Testing Suite - Project Manager Role Focus")
