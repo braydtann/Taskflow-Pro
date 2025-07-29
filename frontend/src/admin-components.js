@@ -44,7 +44,7 @@ export const AdminDashboard = () => {
     );
   }
 
-  const { overview, recent_activity, top_teams, most_active_users } = analytics;
+  const { overview, recent_activity, top_teams, most_active_users, analytics } = analytics;
 
   return (
     <div className="admin-dashboard">
