@@ -216,6 +216,283 @@ export const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Enhanced Analytics Section */}
+      {adminAnalytics && (
+        <div className="admin-enhanced-analytics">
+          <h2 className="admin-section-title">Comprehensive Analytics Dashboard</h2>
+          
+          {/* Enhanced Key Metrics Grid */}
+          <div className="admin-metrics-enhanced">
+            <div className="admin-metric-card scheduled-week">
+              <div className="metric-icon">📅</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.tasks_scheduled_this_week || 0}</div>
+                <div className="metric-label">Tasks Scheduled This Week</div>
+              </div>
+            </div>
+
+            <div className="admin-metric-card hours-scheduled">
+              <div className="metric-icon">⏰</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.task_hours_scheduled_this_week || 0}h</div>
+                <div className="metric-label">Hours Scheduled This Week</div>
+              </div>
+            </div>
+
+            <div className="admin-metric-card past-deadline">
+              <div className="metric-icon">⚠️</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.past_deadline_tasks || 0}</div>
+                <div className="metric-label">Past Deadline Tasks</div>
+              </div>
+            </div>
+
+            <div className="admin-metric-card completed-week">
+              <div className="metric-icon">✅</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.completed_tasks_this_week || 0}</div>
+                <div className="metric-label">Completed Tasks This Week</div>
+              </div>
+            </div>
+
+            <div className="admin-metric-card completed-hours">
+              <div className="metric-icon">🕐</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.completed_task_hours_this_week || 0}h</div>
+                <div className="metric-label">Completed Hours This Week</div>
+              </div>
+            </div>
+
+            <div className="admin-metric-card pm-users">
+              <div className="metric-icon">👔</div>
+              <div className="metric-content">
+                <div className="metric-number">{overview.project_manager_users || 0}</div>
+                <div className="metric-label">Project Managers</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Team Completion Estimates */}
+          {adminAnalytics.team_completion_estimates && Object.keys(adminAnalytics.team_completion_estimates).length > 0 && (
+            <div className="admin-chart-section">
+              <h3 className="admin-chart-title">Team Completion Estimates</h3>
+              <div className="admin-team-estimates">
+                {Object.entries(adminAnalytics.team_completion_estimates).map(([teamName, estimate]) => (
+                  <div key={teamName} className="admin-team-estimate">
+                    <h4 className="team-name">{teamName}</h4>
+                    <div className="estimate-grid">
+                      <div className="estimate-item">
+                        <span className="estimate-number">{estimate.estimated_days}</span>
+                        <span className="estimate-label">Days</span>
+                      </div>
+                      <div className="estimate-item">
+                        <span className="estimate-number">{estimate.remaining_tasks}</span>
+                        <span className="estimate-label">Tasks</span>
+                      </div>
+                      <div className="estimate-item">
+                        <span className="estimate-number">{estimate.estimated_hours}h</span>
+                        <span className="estimate-label">Hours</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Charts Grid */}
+          <div className="admin-charts-grid">
+            {/* Tasks by Project Chart */}
+            {adminAnalytics.tasks_by_project && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">Tasks by Project</h3>
+                <div className="admin-bar-chart">
+                  {Object.entries(adminAnalytics.tasks_by_project).slice(0, 8).map(([project, data]) => (
+                    <div key={project} className="admin-bar-item">
+                      <div className="admin-bar-visual">
+                        <div 
+                          className="bar-segment completed" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`,
+                            backgroundColor: '#10b981'
+                          }}
+                          title={`Completed: ${data.completed}`}
+                        ></div>
+                        <div 
+                          className="bar-segment in-progress" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.in_progress / data.total) * 100 : 0}%`,
+                            backgroundColor: '#3b82f6'
+                          }}
+                          title={`In Progress: ${data.in_progress}`}
+                        ></div>
+                        <div 
+                          className="bar-segment todo" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.todo / data.total) * 100 : 0}%`,
+                            backgroundColor: '#f59e0b'
+                          }}
+                          title={`Todo: ${data.todo}`}
+                        ></div>
+                      </div>
+                      <div className="admin-bar-label" title={project}>
+                        {project.length > 12 ? `${project.substring(0, 12)}...` : project}
+                      </div>
+                      <div className="admin-bar-total">{data.total}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tasks by Team Chart */}
+            {adminAnalytics.tasks_by_team && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">Tasks by Team</h3>
+                <div className="admin-bar-chart">
+                  {Object.entries(adminAnalytics.tasks_by_team).slice(0, 8).map(([team, data]) => (
+                    <div key={team} className="admin-bar-item">
+                      <div className="admin-bar-visual">
+                        <div 
+                          className="bar-segment completed" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`,
+                            backgroundColor: '#10b981'
+                          }}
+                          title={`Completed: ${data.completed}`}
+                        ></div>
+                        <div 
+                          className="bar-segment in-progress" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.in_progress / data.total) * 100 : 0}%`,
+                            backgroundColor: '#3b82f6'
+                          }}
+                          title={`In Progress: ${data.in_progress}`}
+                        ></div>
+                        <div 
+                          className="bar-segment todo" 
+                          style={{ 
+                            height: `${data.total > 0 ? (data.todo / data.total) * 100 : 0}%`,
+                            backgroundColor: '#f59e0b'
+                          }}
+                          title={`Todo: ${data.todo}`}
+                        ></div>
+                      </div>
+                      <div className="admin-bar-label" title={team}>
+                        {team.length > 12 ? `${team.substring(0, 12)}...` : team}
+                      </div>
+                      <div className="admin-bar-total">{data.total}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Projects by ETA */}
+            {adminAnalytics.projects_by_eta && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">Projects by ETA</h3>
+                <div className="admin-pie-chart">
+                  {Object.entries(adminAnalytics.projects_by_eta).map(([status, count], index) => {
+                    const colors = ['#10b981', '#f59e0b', '#ef4444', '#6b7280'];
+                    const total = Object.values(adminAnalytics.projects_by_eta).reduce((a, b) => a + b, 0);
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    
+                    return (
+                      <div key={status} className="pie-item">
+                        <div 
+                          className="pie-color" 
+                          style={{ backgroundColor: colors[index % colors.length] }}
+                        ></div>
+                        <span className="pie-label">{status}</span>
+                        <span className="pie-value">{count} ({percentage.toFixed(1)}%)</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tasks by Assignee - Full Width */}
+          {adminAnalytics.tasks_by_assignee && (
+            <div className="admin-chart-card full-width">
+              <h3 className="admin-chart-title">Tasks by Assignee</h3>
+              <div className="admin-assignee-grid">
+                {Object.entries(adminAnalytics.tasks_by_assignee).slice(0, 12).map(([assignee, data]) => (
+                  <div key={assignee} className="admin-assignee-item">
+                    <div className="assignee-header">
+                      <div className="assignee-avatar">
+                        {assignee.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="assignee-info">
+                        <div className="assignee-name">{assignee}</div>
+                        <div className="assignee-total">{data.total} tasks</div>
+                      </div>
+                    </div>
+                    <div className="assignee-stats">
+                      <div className="stat-item completed">
+                        <span className="stat-number">{data.completed}</span>
+                        <span className="stat-label">Done</span>
+                      </div>
+                      <div className="stat-item in-progress">
+                        <span className="stat-number">{data.in_progress}</span>
+                        <span className="stat-label">Working</span>
+                      </div>
+                      <div className="stat-item todo">
+                        <span className="stat-number">{data.todo}</span>
+                        <span className="stat-label">Todo</span>
+                      </div>
+                      {data.overdue > 0 && (
+                        <div className="stat-item overdue">
+                          <span className="stat-number">{data.overdue}</span>
+                          <span className="stat-label">Overdue</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="assignee-progress-bar">
+                      <div 
+                        className="progress-fill" 
+                        style={{ 
+                          width: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Hours Week over Week - Full Width */}
+          {adminAnalytics.completed_hours_weekly && (
+            <div className="admin-chart-card full-width">
+              <h3 className="admin-chart-title">Completed Hours - Week over Week</h3>
+              <div className="admin-line-chart">
+                <div className="chart-container">
+                  <div className="chart-bars">
+                    {adminAnalytics.completed_hours_weekly.map((week, index) => (
+                      <div key={index} className="chart-bar-container">
+                        <div 
+                          className="chart-bar" 
+                          style={{ 
+                            height: `${Math.min((week.hours / 60) * 100, 100)}%`,
+                            backgroundColor: '#8B5CF6'
+                          }}
+                          title={`${week.hours} hours`}
+                        ></div>
+                        <div className="chart-bar-label">{week.date}</div>
+                        <div className="chart-bar-value">{week.hours}h</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
