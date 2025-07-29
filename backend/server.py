@@ -2206,21 +2206,182 @@ async def get_team(team_id: str, current_user: UserInDB = Depends(get_current_ad
 async def get_admin_dashboard_analytics(current_user: UserInDB = Depends(get_current_admin_user)):
     """Get comprehensive admin dashboard analytics"""
     
-    # User statistics
-    total_users = await db.users.count_documents({"is_active": True})
-    admin_users = await db.users.count_documents({"role": "admin", "is_active": True})
-    regular_users = total_users - admin_users
+    # Get all data for admin analytics
+    all_users = await db.users.find({"is_active": True}).to_list(1000)
+    all_teams = await db.teams.find({"is_active": True}).to_list(1000)
+    all_projects = await db.projects.find({}).to_list(1000)
+    all_tasks = await db.tasks.find({}).to_list(1000)
     
-    # Team statistics
-    total_teams = await db.teams.count_documents({"is_active": True})
+    # Create user and team lookup maps
+    users_map = {user["id"]: user for user in all_users}
+    teams_map = {team["id"]: team for team in all_teams}
     
-    # Task statistics across all users
-    total_tasks = await db.tasks.count_documents({})
-    completed_tasks = await db.tasks.count_documents({"status": "completed"})
-    in_progress_tasks = await db.tasks.count_documents({"status": "in_progress"})
+    # Current date calculations
+    now = datetime.utcnow()
+    week_start = now - timedelta(days=now.weekday())
+    week_end = week_start + timedelta(days=6)
     
-    # Project statistics
-    total_projects = await db.projects.count_documents({"status": "active"})
+    # Basic statistics
+    total_users = len(all_users)
+    admin_users = len([u for u in all_users if u.get("role") == "admin"])
+    project_manager_users = len([u for u in all_users if u.get("role") == "project_manager"])
+    regular_users = total_users - admin_users - project_manager_users
+    total_teams = len(all_teams)
+    total_projects = len(all_projects)
+    active_projects = len([p for p in all_projects if p.get("status") == "active"])
+    completed_projects = len([p for p in all_projects if p.get("status") == "completed"])
+    
+    # Task statistics
+    total_tasks = len(all_tasks)
+    completed_tasks = len([t for t in all_tasks if t.get("status") == "completed"])
+    in_progress_tasks = len([t for t in all_tasks if t.get("status") == "in_progress"])
+    todo_tasks = len([t for t in all_tasks if t.get("status") == "todo"])
+    
+    # Tasks scheduled this week
+    tasks_scheduled_this_week = []
+    task_hours_scheduled_this_week = 0
+    for task in all_tasks:
+        if task.get("due_date") or task.get("start_time"):
+            try:
+                task_date = None
+                if task.get("start_time"):
+                    task_date = datetime.fromisoformat(task["start_time"].replace('Z', '+00:00')) if isinstance(task["start_time"], str) else task["start_time"]
+                elif task.get("due_date"):
+                    task_date = datetime.fromisoformat(task["due_date"].replace('Z', '+00:00')) if isinstance(task["due_date"], str) else task["due_date"]
+                
+                if task_date and week_start <= task_date <= week_end:
+                    tasks_scheduled_this_week.append(task)
+                    task_hours_scheduled_this_week += task.get("estimated_duration", 0) / 60  # Convert minutes to hours
+            except:
+                continue
+    
+    # Past deadline tasks
+    past_deadline_tasks = []
+    for task in all_tasks:
+        if task.get("due_date") and task.get("status") != "completed":
+            try:
+                due_date = datetime.fromisoformat(task["due_date"].replace('Z', '+00:00')) if isinstance(task["due_date"], str) else task["due_date"]
+                if due_date < now:
+                    past_deadline_tasks.append(task)
+            except:
+                continue
+    
+    # Completed tasks this week
+    completed_tasks_this_week = []
+    completed_task_hours_this_week = 0
+    for task in all_tasks:
+        if task.get("status") == "completed" and task.get("completed_at"):
+            try:
+                completed_date = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00')) if isinstance(task["completed_at"], str) else task["completed_at"]
+                if week_start <= completed_date <= week_end:
+                    completed_tasks_this_week.append(task)
+                    completed_task_hours_this_week += (task.get("timer_elapsed_seconds", 0) or task.get("estimated_duration", 0) * 60) / 3600  # Convert to hours
+            except:
+                continue
+    
+    # Tasks by Project analytics
+    tasks_by_project = {}
+    for project in all_projects:
+        project_tasks = [t for t in all_tasks if t.get("project_id") == project["id"]]
+        tasks_by_project[project["name"]] = {
+            "total": len(project_tasks),
+            "completed": len([t for t in project_tasks if t.get("status") == "completed"]),
+            "in_progress": len([t for t in project_tasks if t.get("status") == "in_progress"]),
+            "todo": len([t for t in project_tasks if t.get("status") == "todo"])
+        }
+    
+    # Tasks by Team analytics
+    tasks_by_team = {}
+    for team in all_teams:
+        team_tasks = []
+        team_member_ids = team.get("members", [])
+        for task in all_tasks:
+            if any(member_id in task.get("assigned_users", []) for member_id in team_member_ids):
+                team_tasks.append(task)
+        
+        tasks_by_team[team["name"]] = {
+            "total": len(team_tasks),
+            "completed": len([t for t in team_tasks if t.get("status") == "completed"]),
+            "in_progress": len([t for t in team_tasks if t.get("status") == "in_progress"]),
+            "todo": len([t for t in team_tasks if t.get("status") == "todo"])
+        }
+    
+    # Projects by ETA analytics
+    projects_by_eta = {"On Time": 0, "At Risk": 0, "Overdue": 0, "No Deadline": 0}
+    for project in all_projects:
+        if not project.get("end_date"):
+            projects_by_eta["No Deadline"] += 1
+        else:
+            try:
+                end_date = datetime.fromisoformat(project["end_date"].replace('Z', '+00:00')) if isinstance(project["end_date"], str) else project["end_date"]
+                progress = project.get("progress_percentage", 0)
+                days_remaining = (end_date - now).days
+                
+                if end_date < now and progress < 100:
+                    projects_by_eta["Overdue"] += 1
+                elif days_remaining < 7 and progress < 80:
+                    projects_by_eta["At Risk"] += 1
+                else:
+                    projects_by_eta["On Time"] += 1
+            except:
+                projects_by_eta["No Deadline"] += 1
+    
+    # Tasks by Assignee analytics
+    tasks_by_assignee = {}
+    for user in all_users:
+        user_tasks = []
+        for task in all_tasks:
+            if user["id"] in task.get("assigned_users", []) or task.get("owner_id") == user["id"]:
+                user_tasks.append(task)
+        
+        if user_tasks:  # Only include users with tasks
+            tasks_by_assignee[user["full_name"]] = {
+                "total": len(user_tasks),
+                "completed": len([t for t in user_tasks if t.get("status") == "completed"]),
+                "in_progress": len([t for t in user_tasks if t.get("status") == "in_progress"]),
+                "todo": len([t for t in user_tasks if t.get("status") == "todo"]),
+                "overdue": len([t for t in user_tasks if t in past_deadline_tasks])
+            }
+    
+    # Completed hours week over week (last 8 weeks)
+    completed_hours_weekly = []
+    for week_offset in range(8, 0, -1):
+        week_start_offset = now - timedelta(days=now.weekday() + (week_offset * 7))
+        week_end_offset = week_start_offset + timedelta(days=6)
+        
+        week_completed_tasks = []
+        for task in all_tasks:
+            if task.get("status") == "completed" and task.get("completed_at"):
+                try:
+                    completed_date = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00')) if isinstance(task["completed_at"], str) else task["completed_at"]
+                    if week_start_offset <= completed_date <= week_end_offset:
+                        week_completed_tasks.append(task)
+                except:
+                    continue
+        
+        total_hours = sum((t.get("timer_elapsed_seconds", 0) or t.get("estimated_duration", 0) * 60) / 3600 for t in week_completed_tasks)
+        completed_hours_weekly.append({
+            "week": week_start_offset.strftime("%Y-W%U"),
+            "date": week_start_offset.strftime("%b %d"),
+            "hours": round(total_hours, 1)
+        })
+    
+    # Team completion estimates
+    team_completion_estimates = {}
+    for team in all_teams:
+        team_member_ids = team.get("members", [])
+        team_tasks = [t for t in all_tasks if any(member_id in t.get("assigned_users", []) for member_id in team_member_ids) and t.get("status") != "completed"]
+        
+        if team_tasks:
+            total_estimated_hours = sum(t.get("estimated_duration", 0) for t in team_tasks) / 60  # Convert to hours
+            avg_completion_rate = 8  # Assume 8 hours per day per team member
+            
+            estimated_days = max(1, total_estimated_hours / (len(team_member_ids) * avg_completion_rate)) if team_member_ids else 1
+            team_completion_estimates[team["name"]] = {
+                "estimated_days": round(estimated_days, 1),
+                "remaining_tasks": len(team_tasks),
+                "estimated_hours": round(total_estimated_hours, 1)
+            }
     
     # Recent activity (last 7 days)
     week_ago = datetime.utcnow() - timedelta(days=7)
@@ -2228,42 +2389,63 @@ async def get_admin_dashboard_analytics(current_user: UserInDB = Depends(get_cur
     recent_tasks = await db.tasks.count_documents({"created_at": {"$gte": week_ago}})
     recent_projects = await db.projects.count_documents({"created_at": {"$gte": week_ago}})
     
-    # Top teams by task count
-    pipeline = [
-        {"$lookup": {"from": "tasks", "localField": "members", "foreignField": "owner_id", "as": "member_tasks"}},
-        {"$addFields": {"task_count": {"$size": "$member_tasks"}}},
-        {"$sort": {"task_count": -1}},
-        {"$limit": 5},
-        {"$project": {"name": 1, "task_count": 1, "members": {"$size": "$members"}}}
-    ]
+    # Top teams by task completion
+    top_teams = []
+    for team in all_teams:
+        team_member_ids = team.get("members", [])
+        team_completed_tasks = sum(1 for t in all_tasks if any(member_id in t.get("assigned_users", []) for member_id in team_member_ids) and t.get("status") == "completed")
+        team_total_tasks = sum(1 for t in all_tasks if any(member_id in t.get("assigned_users", []) for member_id in team_member_ids))
+        
+        if team_total_tasks > 0:
+            top_teams.append({
+                "_id": team["id"],
+                "name": team["name"],
+                "task_count": team_completed_tasks,
+                "members": len(team_member_ids),
+                "completion_rate": round((team_completed_tasks / team_total_tasks) * 100, 1)
+            })
     
-    top_teams = await db.teams.aggregate(pipeline).to_list(5)
+    top_teams.sort(key=lambda x: x["completion_rate"], reverse=True)
+    top_teams = top_teams[:5]
     
-    # Most active users (by task completion in last 30 days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    active_users_pipeline = [
-        {"$match": {"status": "completed", "completed_at": {"$gte": thirty_days_ago}}},
-        {"$group": {"_id": "$owner_id", "completed_tasks": {"$sum": 1}}},
-        {"$lookup": {"from": "users", "localField": "_id", "foreignField": "id", "as": "user"}},
-        {"$unwind": "$user"},
-        {"$project": {"user_id": "$_id", "full_name": "$user.full_name", "username": "$user.username", "completed_tasks": 1}},
-        {"$sort": {"completed_tasks": -1}},
-        {"$limit": 5}
-    ]
+    # Most active users (by task completion)
+    most_active_users = []
+    for user in all_users:
+        user_completed_tasks = sum(1 for t in all_tasks if (user["id"] in t.get("assigned_users", []) or t.get("owner_id") == user["id"]) and t.get("status") == "completed")
+        
+        if user_completed_tasks > 0:
+            most_active_users.append({
+                "user_id": user["id"],
+                "full_name": user["full_name"],
+                "username": user["username"],
+                "completed_tasks": user_completed_tasks
+            })
     
-    active_users = await db.tasks.aggregate(active_users_pipeline).to_list(5)
+    most_active_users.sort(key=lambda x: x["completed_tasks"], reverse=True)
+    most_active_users = most_active_users[:5]
     
     return {
         "overview": {
             "total_users": total_users,
             "admin_users": admin_users,
+            "project_manager_users": project_manager_users,
             "regular_users": regular_users,
             "total_teams": total_teams,
             "total_tasks": total_tasks,
             "completed_tasks": completed_tasks,
             "in_progress_tasks": in_progress_tasks,
+            "todo_tasks": todo_tasks,
             "total_projects": total_projects,
-            "completion_rate": round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0, 2)
+            "active_projects": active_projects,
+            "completed_projects": completed_projects,
+            "completion_rate": round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0, 2),
+            
+            # New metrics
+            "tasks_scheduled_this_week": len(tasks_scheduled_this_week),
+            "task_hours_scheduled_this_week": round(task_hours_scheduled_this_week, 1),
+            "past_deadline_tasks": len(past_deadline_tasks),
+            "completed_tasks_this_week": len(completed_tasks_this_week),
+            "completed_task_hours_this_week": round(completed_task_hours_this_week, 1)
         },
         "recent_activity": {
             "new_users_week": recent_users,
@@ -2271,7 +2453,15 @@ async def get_admin_dashboard_analytics(current_user: UserInDB = Depends(get_cur
             "new_projects_week": recent_projects
         },
         "top_teams": top_teams,
-        "most_active_users": active_users,
+        "most_active_users": most_active_users,
+        "analytics": {
+            "tasks_by_project": tasks_by_project,
+            "tasks_by_team": tasks_by_team,
+            "projects_by_eta": projects_by_eta,
+            "tasks_by_assignee": tasks_by_assignee,
+            "completed_hours_weekly": completed_hours_weekly,
+            "team_completion_estimates": team_completion_estimates
+        },
         "generated_at": datetime.utcnow().isoformat()
     }
 
