@@ -45,7 +45,7 @@ export const ProjectManagerDashboard = () => {
     );
   }
 
-  const { overview, projects, team_workload, recent_activities } = dashboard;
+  const { overview, projects, team_workload, recent_activities, analytics } = dashboard;
 
   return (
     <div className="pm-dashboard-container">
