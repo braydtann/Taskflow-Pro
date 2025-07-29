@@ -81,7 +81,7 @@ export const ProjectManagerDashboard = () => {
       {/* Main Content */}
       <div className="pm-main-content">
         {view === 'overview' && (
-          <PMOverview overview={overview} />
+          <PMOverview overview={overview} analytics={analytics} />
         )}
         {view === 'projects' && (
           <PMProjects projects={projects} onRefresh={fetchDashboardData} />
