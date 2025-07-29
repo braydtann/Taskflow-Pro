@@ -717,6 +717,52 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+backend:
+  - task: "Enhanced PM Dashboard Analytics"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented enhanced PM dashboard analytics with comprehensive overview metrics (tasks_assigned_to_me, tasks_scheduled_this_week, task_hours_scheduled_this_week, past_deadline_tasks, completed_tasks_this_week, completed_task_hours_this_week) and analytics object with tasks_by_project, tasks_by_team, projects_by_eta, tasks_by_assignee, completed_hours_weekly, team_completion_estimates"
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Enhanced PM Dashboard Analytics working perfectly! Tested: ✅ Enhanced overview metrics - all 6 new metrics present (tasks_assigned_to_me, tasks_scheduled_this_week, task_hours_scheduled_this_week, past_deadline_tasks, completed_tasks_this_week, completed_task_hours_this_week) ✅ Analytics object - all 6 analytics sections present (tasks_by_project, tasks_by_team, projects_by_eta, tasks_by_assignee, completed_hours_weekly, team_completion_estimates) ✅ Data structure validation - tasks_by_project (dict), tasks_by_team (dict), completed_hours_weekly (list with 8 weeks) ✅ Data consistency - overview metrics align with analytics data ✅ PM user authentication and access control working correctly. Enhanced analytics provide comprehensive project management insights with proper data calculations."
+
+  - task: "Enhanced Admin Dashboard Analytics"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented enhanced admin dashboard analytics with same comprehensive overview metrics as PM dashboard plus project_manager_users count, and same analytics object structure with tasks_by_project, tasks_by_team, projects_by_eta, tasks_by_assignee, completed_hours_weekly, team_completion_estimates"
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Enhanced Admin Dashboard Analytics working excellently! Tested: ✅ Enhanced overview metrics - all 6 new metrics present including project_manager_users count (found 7 PM users) ✅ Analytics object - all 6 analytics sections present with same structure as PM dashboard ✅ Projects by ETA analytics - all 4 ETA categories present (On Time, At Risk, Overdue, No Deadline) ✅ Team completion estimates working correctly ✅ Admin-specific features - top_teams and most_active_users arrays present ✅ Admin user authentication and access control working correctly. Enhanced admin analytics provide comprehensive system-wide insights with proper role-based data access."
+
+  - task: "Analytics Performance and Edge Cases"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented performance optimizations and edge case handling for analytics calculations including graceful handling of empty data, proper completion rate calculations, and efficient data processing"
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Analytics performance and edge cases working perfectly! Tested: ✅ Empty data handling - completion rate calculated correctly (20.0%) with graceful handling of missing data ✅ Performance testing - average response time 0.02s (excellent performance, well under 5s threshold) ✅ Multiple request handling - 3 consecutive requests all successful ✅ Data consistency across multiple calls ✅ Proper error handling and data validation. Analytics system demonstrates excellent performance and reliability even with enhanced calculations."
+
   - task: "Project Manager User Creation and Management"
     implemented: true
     working: true
