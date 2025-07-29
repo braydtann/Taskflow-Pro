@@ -97,60 +97,383 @@ export const ProjectManagerDashboard = () => {
   );
 };
 
-// Overview Component
-const PMOverview = ({ overview }) => {
+// Enhanced Overview Component with Analytics
+const PMOverview = ({ overview, analytics }) => {
+  const [filter, setFilter] = useState({ project: 'all', team: 'all', agent: 'all' });
+
+  // Chart data preparation functions
+  const preparePieChartData = (data) => {
+    return Object.entries(data).map(([key, value]) => ({ name: key, value: value }));
+  };
+
+  const prepareBarChartData = (data) => {
+    return Object.entries(data).map(([key, value]) => ({ 
+      name: key, 
+      total: value.total,
+      completed: value.completed,
+      in_progress: value.in_progress,
+      todo: value.todo 
+    }));
+  };
+
+  const colors = ['#8B5CF6', '#A855F7', '#C084FC', '#D8B4FE', '#E9D5FF'];
+
   return (
     <div className="pm-overview">
-      {/* Key Metrics */}
-      <div className="pm-stats-grid">
-        <div className="pm-stats-card projects-card">
+      {/* Enhanced Key Metrics Grid */}
+      <div className="pm-stats-grid-enhanced">
+        <div className="pm-stats-card assigned-to-me">
+          <div className="pm-stats-icon">👤</div>
           <div className="pm-stats-content">
-            <div className="pm-stats-number">{overview.total_projects}</div>
-            <div className="pm-stats-label">Total Projects</div>
-          </div>
-          <div className="pm-stats-breakdown">
-            <span className="pm-stat-item active">Active: {overview.active_projects}</span>
-            <span className="pm-stat-item completed">Completed: {overview.completed_projects}</span>
-            <span className="pm-stat-item at-risk">At Risk: {overview.at_risk_projects}</span>
+            <div className="pm-stats-number">{overview.tasks_assigned_to_me || 0}</div>
+            <div className="pm-stats-label">Tasks Assigned to Me</div>
           </div>
         </div>
 
-        <div className="pm-stats-card tasks-card">
+        <div className="pm-stats-card scheduled-week">
+          <div className="pm-stats-icon">📅</div>
           <div className="pm-stats-content">
-            <div className="pm-stats-number">{overview.total_tasks}</div>
-            <div className="pm-stats-label">Total Tasks</div>
-          </div>
-          <div className="pm-stats-breakdown">
-            <span className="pm-stat-item completed">Completed: {overview.completed_tasks}</span>
-            <span className="pm-stat-item in-progress">In Progress: {overview.in_progress_tasks}</span>
-            <span className="pm-stat-item overdue">Overdue: {overview.overdue_tasks}</span>
+            <div className="pm-stats-number">{overview.tasks_scheduled_this_week || 0}</div>
+            <div className="pm-stats-label">Tasks Scheduled This Week</div>
           </div>
         </div>
 
-        <div className="pm-stats-card team-card">
+        <div className="pm-stats-card hours-scheduled">
+          <div className="pm-stats-icon">⏰</div>
           <div className="pm-stats-content">
-            <div className="pm-stats-number">{overview.team_size}</div>
-            <div className="pm-stats-label">Team Members</div>
-          </div>
-          <div className="pm-stats-breakdown">
-            <span className="pm-stat-item">Across all projects</span>
+            <div className="pm-stats-number">{overview.task_hours_scheduled_this_week || 0}h</div>
+            <div className="pm-stats-label">Hours Scheduled This Week</div>
           </div>
         </div>
 
-        <div className="pm-stats-card alerts-card">
+        <div className="pm-stats-card past-deadline">
+          <div className="pm-stats-icon">⚠️</div>
           <div className="pm-stats-content">
-            <div className="pm-stats-number">{overview.blocked_tasks}</div>
-            <div className="pm-stats-label">Blocked Tasks</div>
+            <div className="pm-stats-number">{overview.past_deadline_tasks || 0}</div>
+            <div className="pm-stats-label">Past Deadline Tasks</div>
           </div>
-          <div className="pm-stats-breakdown">
-            <span className="pm-stat-item blocked">Need attention</span>
+        </div>
+
+        <div className="pm-stats-card completed-week">
+          <div className="pm-stats-icon">✅</div>
+          <div className="pm-stats-content">
+            <div className="pm-stats-number">{overview.completed_tasks_this_week || 0}</div>
+            <div className="pm-stats-label">Completed Tasks This Week</div>
+          </div>
+        </div>
+
+        <div className="pm-stats-card completed-hours-week">
+          <div className="pm-stats-icon">🕐</div>
+          <div className="pm-stats-content">
+            <div className="pm-stats-number">{overview.completed_task_hours_this_week || 0}h</div>
+            <div className="pm-stats-label">Completed Hours This Week</div>
           </div>
         </div>
       </div>
 
-      {/* Progress Overview Chart */}
+      {/* Team Completion Estimates */}
+      {analytics?.team_completion_estimates && Object.keys(analytics.team_completion_estimates).length > 0 && (
+        <div className="pm-chart-section">
+          <h3 className="pm-section-title">Team Completion Estimates</h3>
+          <div className="team-estimates-grid">
+            {Object.entries(analytics.team_completion_estimates).map(([teamName, estimate]) => (
+              <div key={teamName} className="team-estimate-card">
+                <h4 className="team-name">{teamName}</h4>
+                <div className="estimate-details">
+                  <div className="estimate-item">
+                    <span className="estimate-number">{estimate.estimated_days}</span>
+                    <span className="estimate-label">Days to Complete</span>
+                  </div>
+                  <div className="estimate-item">
+                    <span className="estimate-number">{estimate.remaining_tasks}</span>
+                    <span className="estimate-label">Remaining Tasks</span>
+                  </div>
+                  <div className="estimate-item">
+                    <span className="estimate-number">{estimate.estimated_hours}h</span>
+                    <span className="estimate-label">Estimated Hours</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Charts Section */}
+      <div className="pm-charts-container">
+        {/* Tasks by Project Chart */}
+        {analytics?.tasks_by_project && (
+          <div className="pm-chart-card">
+            <h3 className="pm-chart-title">Tasks by Project</h3>
+            <div className="pm-bar-chart">
+              {Object.entries(analytics.tasks_by_project).map(([project, data], index) => (
+                <div key={project} className="pm-bar-item">
+                  <div className="pm-bar-container">
+                    <div className="pm-bar-stack">
+                      <div 
+                        className="pm-bar-segment completed" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`,
+                          backgroundColor: '#10b981'
+                        }}
+                        title={`Completed: ${data.completed}`}
+                      ></div>
+                      <div 
+                        className="pm-bar-segment in-progress" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.in_progress / data.total) * 100 : 0}%`,
+                          backgroundColor: '#3b82f6'
+                        }}
+                        title={`In Progress: ${data.in_progress}`}
+                      ></div>
+                      <div 
+                        className="pm-bar-segment todo" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.todo / data.total) * 100 : 0}%`,
+                          backgroundColor: '#f59e0b'
+                        }}
+                        title={`Todo: ${data.todo}`}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="pm-bar-label">{project.substring(0, 10)}...</div>
+                  <div className="pm-bar-total">{data.total}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tasks by Team Chart */}
+        {analytics?.tasks_by_team && (
+          <div className="pm-chart-card">
+            <h3 className="pm-chart-title">Tasks by Team</h3>
+            <div className="pm-bar-chart">
+              {Object.entries(analytics.tasks_by_team).map(([team, data], index) => (
+                <div key={team} className="pm-bar-item">
+                  <div className="pm-bar-container">
+                    <div className="pm-bar-stack">
+                      <div 
+                        className="pm-bar-segment completed" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`,
+                          backgroundColor: '#10b981'
+                        }}
+                        title={`Completed: ${data.completed}`}
+                      ></div>
+                      <div 
+                        className="pm-bar-segment in-progress" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.in_progress / data.total) * 100 : 0}%`,
+                          backgroundColor: '#3b82f6'
+                        }}
+                        title={`In Progress: ${data.in_progress}`}
+                      ></div>
+                      <div 
+                        className="pm-bar-segment todo" 
+                        style={{ 
+                          height: `${data.total > 0 ? (data.todo / data.total) * 100 : 0}%`,
+                          backgroundColor: '#f59e0b'
+                        }}
+                        title={`Todo: ${data.todo}`}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="pm-bar-label">{team.substring(0, 10)}...</div>
+                  <div className="pm-bar-total">{data.total}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Projects by ETA Pie Chart */}
+        {analytics?.projects_by_eta && (
+          <div className="pm-chart-card">
+            <h3 className="pm-chart-title">Projects by ETA</h3>
+            <div className="pm-pie-chart">
+              <div className="pie-chart-container">
+                {Object.entries(analytics.projects_by_eta).map(([status, count], index) => {
+                  const total = Object.values(analytics.projects_by_eta).reduce((a, b) => a + b, 0);
+                  const percentage = total > 0 ? (count / total) * 100 : 0;
+                  
+                  return (
+                    <div key={status} className="pie-segment-info">
+                      <div 
+                        className="pie-color-indicator" 
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      ></div>
+                      <span className="pie-label">{status}: {count} ({percentage.toFixed(1)}%)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tasks by Assignee Chart */}
+        {analytics?.tasks_by_assignee && (
+          <div className="pm-chart-card full-width">
+            <h3 className="pm-chart-title">Tasks by Assignee</h3>
+            <div className="assignee-chart-container">
+              {Object.entries(analytics.tasks_by_assignee).slice(0, 10).map(([assignee, data]) => (
+                <div key={assignee} className="assignee-row">
+                  <div className="assignee-info">
+                    <div className="assignee-name">{assignee}</div>
+                    <div className="assignee-stats">
+                      <span className="stat completed">✓ {data.completed}</span>
+                      <span className="stat in-progress">⏳ {data.in_progress}</span>
+                      <span className="stat todo">📝 {data.todo}</span>
+                      {data.overdue > 0 && <span className="stat overdue">⚠️ {data.overdue}</span>}
+                    </div>
+                  </div>
+                  <div className="assignee-progress">
+                    <div className="progress-bar-full">
+                      <div 
+                        className="progress-bar-fill" 
+                        style={{ 
+                          width: `${data.total > 0 ? (data.completed / data.total) * 100 : 0}%`,
+                          backgroundColor: '#10b981'
+                        }}
+                      ></div>
+                    </div>
+                    <span className="progress-text">{data.total} total</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Completed Hours Week over Week */}
+        {analytics?.completed_hours_weekly && (
+          <div className="pm-chart-card full-width">
+            <h3 className="pm-chart-title">
+              Completed Hours - Week over Week
+              <div className="chart-filters">
+                <select 
+                  value={filter.project} 
+                  onChange={(e) => setFilter({...filter, project: e.target.value})}
+                  className="chart-filter-select"
+                >
+                  <option value="all">All Projects</option>
+                </select>
+                <select 
+                  value={filter.team} 
+                  onChange={(e) => setFilter({...filter, team: e.target.value})}
+                  className="chart-filter-select"
+                >
+                  <option value="all">All Teams</option>
+                </select>
+                <select 
+                  value={filter.agent} 
+                  onChange={(e) => setFilter({...filter, agent: e.target.value})}
+                  className="chart-filter-select"
+                >
+                  <option value="all">All Agents</option>
+                </select>
+              </div>
+            </h3>
+            <div className="line-chart-container">
+              <div className="line-chart">
+                <svg viewBox="0 0 800 300" className="line-chart-svg">
+                  <defs>
+                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" style={{stopColor: '#8B5CF6', stopOpacity: 0.8}} />
+                      <stop offset="100%" style={{stopColor: '#8B5CF6', stopOpacity: 0.1}} />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Chart area */}
+                  <g transform="translate(60, 20)">
+                    {/* Grid lines */}
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <line 
+                        key={i} 
+                        x1="0" 
+                        y1={i * 60} 
+                        x2="700" 
+                        y2={i * 60} 
+                        stroke="#E5E7EB" 
+                        strokeWidth="1"
+                      />
+                    ))}
+                    
+                    {/* Data points and line */}
+                    {analytics.completed_hours_weekly.length > 1 && (
+                      <g>
+                        {/* Line path */}
+                        <path
+                          d={`M ${analytics.completed_hours_weekly.map((point, index) => 
+                            `${index * (700 / (analytics.completed_hours_weekly.length - 1))},${240 - (point.hours * 4)}`
+                          ).join(' L ')}`}
+                          fill="none"
+                          stroke="#8B5CF6"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                        
+                        {/* Area fill */}
+                        <path
+                          d={`M ${analytics.completed_hours_weekly.map((point, index) => 
+                            `${index * (700 / (analytics.completed_hours_weekly.length - 1))},${240 - (point.hours * 4)}`
+                          ).join(' L ')} L 700,240 L 0,240 Z`}
+                          fill="url(#lineGradient)"
+                        />
+                        
+                        {/* Data points */}
+                        {analytics.completed_hours_weekly.map((point, index) => (
+                          <g key={index}>
+                            <circle
+                              cx={index * (700 / (analytics.completed_hours_weekly.length - 1))}
+                              cy={240 - (point.hours * 4)}
+                              r="6"
+                              fill="#8B5CF6"
+                              stroke="white"
+                              strokeWidth="2"
+                            />
+                            {/* Week labels */}
+                            <text
+                              x={index * (700 / (analytics.completed_hours_weekly.length - 1))}
+                              y="270"
+                              textAnchor="middle"
+                              fontSize="12"
+                              fill="#6B7280"
+                            >
+                              {point.date}
+                            </text>
+                          </g>
+                        ))}
+                      </g>
+                    )}
+                  </g>
+                  
+                  {/* Y-axis labels */}
+                  <g>
+                    {[0, 15, 30, 45, 60].map((value, index) => (
+                      <text
+                        key={value}
+                        x="50"
+                        y={260 - (index * 60)}
+                        textAnchor="end"
+                        fontSize="12"
+                        fill="#6B7280"
+                      >
+                        {value}h
+                      </text>
+                    ))}
+                  </g>
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Original project progress for compatibility */}
       <div className="pm-progress-section">
-        <h3 className="pm-section-title">Project Progress Overview</h3>
+        <h3 className="pm-section-title">Quick Progress Overview</h3>
         <div className="pm-progress-chart">
           <div className="pm-progress-item">
             <div className="pm-progress-bar">
