@@ -2293,12 +2293,16 @@ async def search_users(query: str, current_user: UserInDB = Depends(get_current_
 # Project Manager Dashboard endpoints
 @api_router.get("/pm/dashboard")
 async def get_project_manager_dashboard(current_user: UserInDB = Depends(get_current_project_manager)):
-    """Get project manager dashboard analytics"""
+    """Get enhanced project manager dashboard analytics"""
     
     # Get projects the user can manage
     if current_user.role == UserRole.ADMIN:
         # Admin can see all projects
         projects = await db.projects.find({}).to_list(1000)
+        # Get all tasks for admin
+        all_tasks = await db.tasks.find({}).to_list(1000)
+        all_users = await db.users.find({"is_active": True}).to_list(1000)
+        all_teams = await db.teams.find({"is_active": True}).to_list(1000)
     else:
         # Project managers can see projects they're assigned to
         projects = await db.projects.find({
@@ -2307,63 +2311,220 @@ async def get_project_manager_dashboard(current_user: UserInDB = Depends(get_cur
                 {"owner_id": current_user.id}
             ]
         }).to_list(1000)
+        
+        # Get tasks for managed projects and assigned to user
+        project_ids = [p["id"] for p in projects]
+        all_tasks = await db.tasks.find({
+            "$or": [
+                {"project_id": {"$in": project_ids}},
+                {"assigned_users": current_user.id},
+                {"collaborators": current_user.id},
+                {"owner_id": current_user.id}
+            ]
+        }).to_list(1000)
+        
+        # Get relevant users and teams
+        all_users = await db.users.find({"is_active": True}).to_list(1000)
+        all_teams = await db.teams.find({"is_active": True}).to_list(1000)
     
-    # Calculate project statistics
+    # Create user and team lookup maps
+    users_map = {user["id"]: user for user in all_users}
+    teams_map = {team["id"]: team for team in all_teams}
+    
+    # Current date calculations
+    now = datetime.utcnow()
+    week_start = now - timedelta(days=now.weekday())
+    week_end = week_start + timedelta(days=6)
+    
+    # Basic project statistics
     total_projects = len(projects)
     active_projects = len([p for p in projects if p.get("status") == "active"])
     completed_projects = len([p for p in projects if p.get("status") == "completed"])
     at_risk_projects = len([p for p in projects if p.get("status") == "on_hold"])
     
-    # Get tasks for these projects
-    project_ids = [p["id"] for p in projects]
-    tasks = await db.tasks.find({"project_id": {"$in": project_ids}}).to_list(1000)
+    # Enhanced task analytics
+    tasks_assigned_to_me = [t for t in all_tasks if current_user.id in t.get("assigned_users", []) or t.get("owner_id") == current_user.id]
     
-    total_tasks = len(tasks)
-    completed_tasks = len([t for t in tasks if t.get("status") == "completed"])
-    in_progress_tasks = len([t for t in tasks if t.get("status") == "in_progress"])
-    
-    # Handle datetime parsing for overdue tasks
-    overdue_tasks = 0
-    for task in tasks:
-        if task.get("due_date") and task.get("status") != "completed":
+    # Tasks scheduled this week
+    tasks_scheduled_this_week = []
+    task_hours_scheduled_this_week = 0
+    for task in all_tasks:
+        if task.get("due_date") or task.get("start_time"):
             try:
-                due_date = task["due_date"]
-                if isinstance(due_date, str):
-                    # Parse string datetime
-                    due_date_obj = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
-                else:
-                    # Already a datetime object
-                    due_date_obj = due_date
+                task_date = None
+                if task.get("start_time"):
+                    task_date = datetime.fromisoformat(task["start_time"].replace('Z', '+00:00')) if isinstance(task["start_time"], str) else task["start_time"]
+                elif task.get("due_date"):
+                    task_date = datetime.fromisoformat(task["due_date"].replace('Z', '+00:00')) if isinstance(task["due_date"], str) else task["due_date"]
                 
-                if due_date_obj < datetime.utcnow():
-                    overdue_tasks += 1
-            except (ValueError, TypeError) as e:
-                # Skip tasks with invalid datetime formats
+                if task_date and week_start <= task_date <= week_end:
+                    tasks_scheduled_this_week.append(task)
+                    task_hours_scheduled_this_week += task.get("estimated_duration", 0) / 60  # Convert minutes to hours
+            except:
                 continue
     
-    blocked_tasks = len([t for t in tasks if t.get("status") == "blocked"])
+    # Past deadline tasks
+    past_deadline_tasks = []
+    for task in all_tasks:
+        if task.get("due_date") and task.get("status") != "completed":
+            try:
+                due_date = datetime.fromisoformat(task["due_date"].replace('Z', '+00:00')) if isinstance(task["due_date"], str) else task["due_date"]
+                if due_date < now:
+                    past_deadline_tasks.append(task)
+            except:
+                continue
     
-    # Get team members across all projects
+    # Completed tasks this week
+    completed_tasks_this_week = []
+    completed_task_hours_this_week = 0
+    for task in all_tasks:
+        if task.get("status") == "completed" and task.get("completed_at"):
+            try:
+                completed_date = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00')) if isinstance(task["completed_at"], str) else task["completed_at"]
+                if week_start <= completed_date <= week_end:
+                    completed_tasks_this_week.append(task)
+                    completed_task_hours_this_week += (task.get("timer_elapsed_seconds", 0) or task.get("estimated_duration", 0) * 60) / 3600  # Convert to hours
+            except:
+                continue
+    
+    # Tasks by Project analytics
+    tasks_by_project = {}
+    for project in projects:
+        project_tasks = [t for t in all_tasks if t.get("project_id") == project["id"]]
+        tasks_by_project[project["name"]] = {
+            "total": len(project_tasks),
+            "completed": len([t for t in project_tasks if t.get("status") == "completed"]),
+            "in_progress": len([t for t in project_tasks if t.get("status") == "in_progress"]),
+            "todo": len([t for t in project_tasks if t.get("status") == "todo"])
+        }
+    
+    # Tasks by Team analytics
+    tasks_by_team = {}
+    for team in all_teams:
+        team_tasks = []
+        team_member_ids = team.get("members", [])
+        for task in all_tasks:
+            if any(member_id in task.get("assigned_users", []) for member_id in team_member_ids):
+                team_tasks.append(task)
+        
+        tasks_by_team[team["name"]] = {
+            "total": len(team_tasks),
+            "completed": len([t for t in team_tasks if t.get("status") == "completed"]),
+            "in_progress": len([t for t in team_tasks if t.get("status") == "in_progress"]),
+            "todo": len([t for t in team_tasks if t.get("status") == "todo"])
+        }
+    
+    # Projects by ETA analytics
+    projects_by_eta = {"On Time": 0, "At Risk": 0, "Overdue": 0, "No Deadline": 0}
+    for project in projects:
+        if not project.get("end_date"):
+            projects_by_eta["No Deadline"] += 1
+        else:
+            try:
+                end_date = datetime.fromisoformat(project["end_date"].replace('Z', '+00:00')) if isinstance(project["end_date"], str) else project["end_date"]
+                progress = project.get("progress_percentage", 0)
+                days_remaining = (end_date - now).days
+                
+                if end_date < now and progress < 100:
+                    projects_by_eta["Overdue"] += 1
+                elif days_remaining < 7 and progress < 80:
+                    projects_by_eta["At Risk"] += 1
+                else:
+                    projects_by_eta["On Time"] += 1
+            except:
+                projects_by_eta["No Deadline"] += 1
+    
+    # Tasks by Assignee analytics
+    tasks_by_assignee = {}
+    for user in all_users:
+        user_tasks = []
+        for task in all_tasks:
+            if user["id"] in task.get("assigned_users", []) or task.get("owner_id") == user["id"]:
+                user_tasks.append(task)
+        
+        if user_tasks:  # Only include users with tasks
+            tasks_by_assignee[user["full_name"]] = {
+                "total": len(user_tasks),
+                "completed": len([t for t in user_tasks if t.get("status") == "completed"]),
+                "in_progress": len([t for t in user_tasks if t.get("status") == "in_progress"]),
+                "todo": len([t for t in user_tasks if t.get("status") == "todo"]),
+                "overdue": len([t for t in user_tasks if t in past_deadline_tasks])
+            }
+    
+    # Completed hours week over week (last 8 weeks)
+    completed_hours_weekly = []
+    for week_offset in range(8, 0, -1):
+        week_start_offset = now - timedelta(days=now.weekday() + (week_offset * 7))
+        week_end_offset = week_start_offset + timedelta(days=6)
+        
+        week_completed_tasks = []
+        for task in all_tasks:
+            if task.get("status") == "completed" and task.get("completed_at"):
+                try:
+                    completed_date = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00')) if isinstance(task["completed_at"], str) else task["completed_at"]
+                    if week_start_offset <= completed_date <= week_end_offset:
+                        week_completed_tasks.append(task)
+                except:
+                    continue
+        
+        total_hours = sum((t.get("timer_elapsed_seconds", 0) or t.get("estimated_duration", 0) * 60) / 3600 for t in week_completed_tasks)
+        completed_hours_weekly.append({
+            "week": week_start_offset.strftime("%Y-W%U"),
+            "date": week_start_offset.strftime("%b %d"),
+            "hours": round(total_hours, 1)
+        })
+    
+    # Team completion estimates
+    team_completion_estimates = {}
+    for team in all_teams:
+        team_member_ids = team.get("members", [])
+        team_tasks = [t for t in all_tasks if any(member_id in t.get("assigned_users", []) for member_id in team_member_ids) and t.get("status") != "completed"]
+        
+        if team_tasks:
+            total_estimated_hours = sum(t.get("estimated_duration", 0) for t in team_tasks) / 60  # Convert to hours
+            avg_completion_rate = 8  # Assume 8 hours per day per team member
+            
+            estimated_days = max(1, total_estimated_hours / (len(team_member_ids) * avg_completion_rate)) if team_member_ids else 1
+            team_completion_estimates[team["name"]] = {
+                "estimated_days": round(estimated_days, 1),
+                "remaining_tasks": len(team_tasks),
+                "estimated_hours": round(total_estimated_hours, 1)
+            }
+    
+    # Get team members for workload calculation
     team_members = set()
     for project in projects:
         team_members.update(project.get("collaborators", []))
         team_members.update(project.get("project_managers", []))
         team_members.add(project.get("owner_id"))
     
-    # Calculate team workload
+    # Enhanced team workload
     team_workload = {}
     for member_id in team_members:
-        if member_id:
-            member_tasks = [t for t in tasks if member_id in t.get("assigned_users", []) or member_id in t.get("collaborators", []) or t.get("owner_id") == member_id]
+        if member_id and member_id in users_map:
+            user = users_map[member_id]
+            member_tasks = [t for t in all_tasks if member_id in t.get("assigned_users", []) or member_id in t.get("collaborators", []) or t.get("owner_id") == member_id]
             active_tasks = [t for t in member_tasks if t.get("status") in ["todo", "in_progress"]]
+            overdue_member_tasks = [t for t in member_tasks if t in past_deadline_tasks]
+            
             team_workload[member_id] = {
-                "total_tasks": len(member_tasks),
-                "active_tasks": len(active_tasks),
-                "completed_tasks": len([t for t in member_tasks if t.get("status") == "completed"])
+                "user": {
+                    "id": user["id"],
+                    "full_name": user["full_name"],
+                    "role": user["role"]
+                },
+                "tasks": {
+                    "total": len(member_tasks),
+                    "active": len(active_tasks),
+                    "completed": len([t for t in member_tasks if t.get("status") == "completed"]),
+                    "overdue": len(overdue_member_tasks)
+                },
+                "availability": "available" if len(active_tasks) <= 5 else "busy"
             }
     
-    # Recent activity for projects
+    # Recent activity
     week_ago = datetime.utcnow() - timedelta(days=7)
+    project_ids = [p["id"] for p in projects]
     recent_activities = await db.activity_logs.find({
         "project_id": {"$in": project_ids},
         "timestamp": {"$gte": week_ago}
@@ -2375,12 +2536,20 @@ async def get_project_manager_dashboard(current_user: UserInDB = Depends(get_cur
             "active_projects": active_projects,
             "completed_projects": completed_projects,
             "at_risk_projects": at_risk_projects,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "in_progress_tasks": in_progress_tasks,
-            "overdue_tasks": overdue_tasks,
-            "blocked_tasks": blocked_tasks,
-            "team_size": len(team_members)
+            "total_tasks": len(all_tasks),
+            "completed_tasks": len([t for t in all_tasks if t.get("status") == "completed"]),
+            "in_progress_tasks": len([t for t in all_tasks if t.get("status") == "in_progress"]),
+            "overdue_tasks": len(past_deadline_tasks),
+            "blocked_tasks": len([t for t in all_tasks if t.get("status") == "blocked"]),
+            "team_size": len(team_members),
+            
+            # New metrics
+            "tasks_assigned_to_me": len(tasks_assigned_to_me),
+            "tasks_scheduled_this_week": len(tasks_scheduled_this_week),
+            "task_hours_scheduled_this_week": round(task_hours_scheduled_this_week, 1),
+            "past_deadline_tasks": len(past_deadline_tasks),
+            "completed_tasks_this_week": len(completed_tasks_this_week),
+            "completed_task_hours_this_week": round(completed_task_hours_this_week, 1)
         },
         "projects": [
             {
@@ -2411,7 +2580,17 @@ async def get_project_manager_dashboard(current_user: UserInDB = Depends(get_cur
                 "timestamp": a["timestamp"]
             }
             for a in recent_activities
-        ]
+        ],
+        
+        # New analytics sections
+        "analytics": {
+            "tasks_by_project": tasks_by_project,
+            "tasks_by_team": tasks_by_team,
+            "projects_by_eta": projects_by_eta,
+            "tasks_by_assignee": tasks_by_assignee,
+            "completed_hours_weekly": completed_hours_weekly,
+            "team_completion_estimates": team_completion_estimates
+        }
     }
 
 @api_router.get("/pm/projects")
